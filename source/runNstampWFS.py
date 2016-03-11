@@ -59,20 +59,10 @@ def main():
             print(expid, imgdir)
 
         snrfile = os.path.join(imgdir, 'snr.txt')
-        if (args.snroff and os.path.isfile(snrfile)):
-            fileSNR = []
-            fileType =[]
-            fileList=[]
-            fidr = open(snrfile, 'r')
-            for line in fidr:
-                fileList.append(line.split()[0])
-                fileType.append(line.split()[1])
-                fileSNR.append(float(line.split()[2]))
-            fidr.close()
-            fileSNR = np.array(fileSNR)
-        else:
+        if not args.snroff:
             getSNRandType(snrfile,
                 imgdir, outerR, inst.obscuration, args.debugLevel)
+        fileSNR, fileType, fileList = readSNRfile(snrfile)
 
         if not args.plotsoff:
             plotSNR(fileSNR, fileType, args.snrcut,
@@ -97,6 +87,19 @@ def main():
             
         sys.exit()
 
+def readSNRfile(snrfile):
+    fileSNR = []
+    fileType =[]
+    fileList=[]
+    fidr = open(snrfile, 'r')
+    for line in fidr:
+        fileList.append(line.split()[0])
+        fileType.append(line.split()[1])
+        fileSNR.append(float(line.split()[2]))
+    fidr.close()
+    fileSNR = np.array(fileSNR)
+    return fileSNR, fileType, fileList
+            
 def parallelCwfs(imgdir, fileList, isenGrp, fileSNR, fileType, snrcut, outerR,
                  stampSize, numproc, debugLevel, zcfile):
     inst = cwfsInstru(instruFile, stampSize)
