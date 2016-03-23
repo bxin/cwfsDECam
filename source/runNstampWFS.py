@@ -55,10 +55,13 @@ def main():
             
     for expid in expidList:
         imgdir = os.path.join(rvddate, dataset, expid)
+        outdir = os.path.join('output', imgdir)
+        if not os.path.isdir(outdir):
+            os.makedirs(outdir)
         if args.debugLevel >= 0:
             print(expid, imgdir)
 
-        snrfile = os.path.join(imgdir, 'snr.txt')
+        snrfile = os.path.join(outdir, 'snr.txt')
         if not args.snroff:
             getSNRandType(snrfile,
                 imgdir, outerR, inst.obscuration, args.debugLevel)
@@ -66,26 +69,39 @@ def main():
 
         if not args.plotsoff:
             plotSNR(fileSNR, fileType, args.snrcut,
-                    os.path.join(imgdir, 'snr.png'))
+                    os.path.join(outdir, 'snr.png'))
             plotExampleDonuts(fileList, fileType, fileSNR, args.snrcut,
-                              os.path.join(imgdir, 'donuts.png'), imgdir)
+                              os.path.join(outdir, 'donuts.png'), imgdir)
 
         for isenGrp in range(4):
-            zcfile = os.path.join(imgdir, 'cwfs_grp%d.txt'%isenGrp)
-            if args.cwfsoff:
-                # read in cwfs results
-                a=1
-            else:
+            zcfile = os.path.join(outdir, 'cwfs_grp%d.txt'%isenGrp)
+            pairListFile = os.path.join(outdir, 'pairs_grp%d.txt'%isenGrp)
+            if not args.cwfsoff:
                 # run cwfs
                 stamp = cwfsImage(os.path.join(imgdir, fileList[0]), [0, 0], '')
                 stampSize = stamp.sizeinPix
                 parallelCwfs(imgdir, fileList, isenGrp, fileSNR, fileType, args.snrcut, outerR,
-                                stampSize, args.numproc, args.debugLevel, zcfile)
-                sys.exit()
-            ax = plt.subplot(2, 2 , isenGrp)
-            # plot zc
+                                stampSize, args.numproc, args.debugLevel, zcfile, pairListFile)
+            # read in cwfs results
+            zcarray = np.loadtxt(zcfile)
             
-        sys.exit()
+        # plot zc
+        plotComp()
+
+def plotComp():
+    
+    x = range(4, znmax + 1)
+    for isenGrp in range(4):
+            
+        ax = plt.subplot(2, 2 , isenGrp+1)
+        npair = zcarray.shape[0]
+        for ipair in range(npair):
+            plt.plot(x, zcarray[ipair, :], # label = '',
+                    marker='.', color='r', markersize=10, linestyle='--')
+        plt.xlabel('Zernike index')
+        plt.ylabel('Coefficients (nm)')
+        #ihdu[0].header['ZERN%d'%2]
+
 
 def readSNRfile(snrfile):
     fileSNR = []
@@ -101,12 +117,10 @@ def readSNRfile(snrfile):
     return fileSNR, fileType, fileList
             
 def parallelCwfs(imgdir, fileList, isenGrp, fileSNR, fileType, snrcut, outerR,
-                 stampSize, numproc, debugLevel, zcfile):
+                 stampSize, numproc, debugLevel, zcfile, pairListFile):
     inst = cwfsInstru(instruFile, stampSize)
     algo = cwfsAlgo(algoFile, inst, debugLevel)
-    jobs = []
-    counter = 0
-
+    
     intraIdx = np.array([x=='intra%d'%isenGrp for x in fileType])
     extraIdx = np.array([x=='extra%d'%isenGrp for x in fileType])
     npair = min(sum(fileSNR[intraIdx]>snrcut),
@@ -115,32 +129,39 @@ def parallelCwfs(imgdir, fileList, isenGrp, fileSNR, fileType, snrcut, outerR,
     intraIdxS = sorted(aa[intraIdx],key=lambda x:fileSNR[x], reverse=True)
     extraIdxS = sorted(aa[extraIdx],key=lambda x:fileSNR[x], reverse=True)
 
-    zcarray = np.zeros((npair, znmax-3))
+    argList = []
+    fidw = open(pairListFile, 'w')
     for ipair in range(npair):
-        stamp = cwfsImage(os.path.join(imgdir, fileList[intraIdxS[ipair]]), [0, 0], '')
+        I1File = os.path.join(imgdir, fileList[intraIdxS[ipair]])
+        stamp = cwfsImage(I1File, [0, 0], '')
         stamp.rmBkgd(outerR, debugLevel)
         stamp.normalizeI(outerR, inst.obscuration)
         I1Array = stamp.image
-        stamp = cwfsImage(os.path.join(imgdir, fileList[extraIdxS[ipair]]), [0, 0], '')
+        
+        I2File = os.path.join(imgdir, fileList[extraIdxS[ipair]])
+        stamp = cwfsImage(I2File, [0, 0], '')
         stamp.rmBkgd(outerR, debugLevel)
         stamp.normalizeI(outerR, inst.obscuration)
         I2Array = stamp.image
+        
         # test, pdb cannot go into the subprocess
-        # runcwfs(ipair, I1Array, I2Array, inst, algo, zcarray)
-        p = multiprocessing.Process(
-            target=runcwfs, name='cwfs%d' % ipair, args=(ipair,
-                I1Array, I2Array, inst, algo, zcarray))
-        jobs.append(p)
-        p.start()
-        counter += 1
-        if (counter == numproc) or (ipair == npair - 1):
-            for p in jobs:
-                p.join()
-            counter = 0
-            jobs = []
+        # runcwfs(I1Array, I2Array, inst, algo)
+        argList.append((I1Array, I2Array, inst, algo))
+        fidw.write('%s\t%s\n'%(I1File, I2File))
+    fidw.close()
+    pool = multiprocessing.Pool(numproc)
+    zcarray = pool.map(runcwfs, argList)
+    pool.close()
+    pool.join()
+        
     np.savetxt(zcfile, zcarray)
 
-def runcwfs(ipair, I1File, I2File, inst, algo, zcarray):
+def runcwfs(argList):
+    I1File = argList[0]
+    I2File = argList[1]
+    inst = argList[2]
+    algo = argList[3]
+    
     I1Field = [0, 0]
     I2Field = [0, 0]
     
@@ -149,7 +170,7 @@ def runcwfs(ipair, I1File, I2File, inst, algo, zcarray):
     algo.reset(I1, I2)
     algo.runIt(inst, I1, I2, model)
 
-    zcarray[ipair, :] = algo.zer4UpNm
+    return algo.zer4UpNm
     
 def plotExampleDonuts(fileList, fileType, fileSNR, snrcut, pngfile, imgdir):
     # take a look at some example images 
