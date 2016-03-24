@@ -1,5 +1,4 @@
 import os
-import sys
 import argparse
 import multiprocessing
 
@@ -22,6 +21,8 @@ def main():
     parser = argparse.ArgumentParser(
         description='----- runNstampWFS.py ---------')
     parser.add_argument('snrcut', type=float, help='threshold on SNR')
+    parser.add_argument('-expid', dest='expid', default=-1, type=int,
+                        help='exposure ID; default = -1, run over everything')
     parser.add_argument('-snroff', help='w/o recalculating SNR of images',
                         action='store_true')
     parser.add_argument('-cwfsoff', help='w/o running cwfs',
@@ -56,6 +57,8 @@ def main():
         print(outerR)
             
     for expid in expidList:
+        if (args.expid>0 and int(expid) !=args.expid):
+            continue
         imgdir = os.path.join(rvddate, dataset, expid)
         outdir = os.path.join('output', imgdir)
         if not os.path.isdir(outdir):
@@ -99,11 +102,27 @@ def plotComp(outdir):
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12,10))
     for isenGrp in range(4):
             
+        #plt.subplot(2, 2 , isenGrp+1)
+        icol = isenGrp%2
+        irow = np.int8(np.floor(isenGrp/2))
         # read in cwfs results
         zcfile = os.path.join(outdir, 'cwfs_grp%d.txt'%isenGrp)
         zcarray = np.loadtxt(zcfile)
+        
         #filter out those with caustic warning
-        zcarray = zcarray[zcarray[:,-1]==0, 0:-1]
+        try:
+            zcarray = zcarray[zcarray[:,-1]==0, 0:-1]
+        except IndexError: #when zcarray is empty, no donuts with snr>snrcut
+            npair = 0
+            if isenGrp == 0:
+                axes[irow, icol].set_title('%s/%s, %s - %s, npair=%d'%(
+                    outdir.split('/')[2],outdir.split('/')[3],
+                    intraname[isenGrp], extraname[isenGrp], npair))
+            else:
+                axes[irow, icol].set_title('%s - %s, npair=%d'%(
+                    intraname[isenGrp], extraname[isenGrp], npair))
+            
+            continue
         npair = zcarray.shape[0]
         # read in DES results
         deszc0file = os.path.join(outdir, 'deszc0_grp%d.txt'%(isenGrp))
@@ -114,11 +133,8 @@ def plotComp(outdir):
         deszc0 = deszc0[np.isnan(deszc0[:,0])==False,:]
         deszc1 = deszc1[np.isnan(deszc1[:,0])==False,:]
         nzc0 = deszc0.shape[0]
-        nzc1 = deszc1.shape[1]
+        nzc1 = deszc1.shape[0]
         
-        #plt.subplot(2, 2 , isenGrp+1)
-        icol = isenGrp%2
-        irow = np.int8(np.floor(isenGrp/2))
         for ipair in range(npair):
             if ipair == 0:
                 axes[irow, icol].plot(x, zcarray[ipair, :], label = 'LSST All Pairs',
@@ -126,14 +142,14 @@ def plotComp(outdir):
             else:
                 axes[irow, icol].plot(x, zcarray[ipair, :], # label = '',
                         marker='.', color='r', markersize=5, linestyle='--')
-        for izc0 in range(npair):
+        for izc0 in range(nzc0):
             if izc0 == 0:
                 axes[irow, icol].plot(x, deszc0[izc0, :], label = 'DES All z4-11',
                         marker='.', color='b', markersize=5, linestyle='--')
             else:
                 axes[irow, icol].plot(x, deszc0[izc0, :], # label = '',
                         marker='.', color='b', markersize=5, linestyle='--')
-        for izc1 in range(npair):
+        for izc1 in range(nzc1):
             if izc1 == 0:
                 axes[irow, icol].plot(x, deszc1[izc1, :], label = 'DES All z4-11,14,15',
                         marker='.', color='g', markersize=5, linestyle='--')
@@ -151,6 +167,7 @@ def plotComp(outdir):
         axes[irow, icol].set_xlabel('Zernike index')
         axes[irow, icol].set_ylabel('Coefficients (nm)')
         axes[irow, icol].legend(loc='best', framealpha = 0.5)
+        
         if isenGrp == 0:
             axes[irow, icol].set_title('%s/%s, %s - %s, npair=%d'%(
                 outdir.split('/')[2],outdir.split('/')[3],
@@ -158,6 +175,7 @@ def plotComp(outdir):
         else:
             axes[irow, icol].set_title('%s - %s, npair=%d'%(
                 intraname[isenGrp], extraname[isenGrp], npair))
+            
 
     plt.savefig(os.path.join(outdir, 'solution.png'))
     
@@ -330,11 +348,11 @@ def plotExampleDonuts(fileList, fileType, fileSNR, snrcut, pngfile, imgdir):
             isub=i+1+nplot*isenGrp
             if isenGrp>=2:
                 isub=isub+2*nplot
-            ax = plt.subplot(4,2*nplot,isub)
+            plt.subplot(4,2*nplot,isub)
             plt.imshow(I1, origin='lower', vmin=myvmin, vmax=myvmax)
             plt.axis('off')
             plt.title(I1title)
-            ax = plt.subplot(4,2*nplot,isub+2*nplot)
+            plt.subplot(4,2*nplot,isub+2*nplot)
             plt.imshow(I2, origin='lower', vmin=myvmin, vmax=myvmax)
             plt.axis('off')
             plt.title(I2title)
@@ -368,7 +386,7 @@ def getSNRandType(snrfile, imgdir, outerR, obsR, debugLevel):
             
 def plotSNR(fileSNR, fileType, snrcut, pngfile):
     for isenGrp in range(4):
-        ax = plt.subplot(2, 2, isenGrp+1)
+        plt.subplot(2, 2, isenGrp+1)
         intraIdx = np.array([x=='intra%d'%isenGrp for x in fileType])
         plt.plot(sorted(fileSNR[intraIdx], reverse=True), marker='o',
                  color='r', label='intra%d'%isenGrp)
