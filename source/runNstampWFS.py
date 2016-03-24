@@ -28,6 +28,8 @@ def main():
                         action='store_true')
     parser.add_argument('-plotsoff', help='w/o making plots',
                         action='store_true')
+    parser.add_argument('-deszcfitsoff', help='w/o reading DES zc fits files',
+                        action='store_true')
     parser.add_argument('-p', dest='numproc', default=1, type=int,
                         help='Number of Processors Phosim uses')
     parser.add_argument('-d', dest='debugLevel', type=int,
@@ -74,34 +76,156 @@ def main():
                               os.path.join(outdir, 'donuts.png'), imgdir)
 
         for isenGrp in range(4):
-            zcfile = os.path.join(outdir, 'cwfs_grp%d.txt'%isenGrp)
             pairListFile = os.path.join(outdir, 'pairs_grp%d.txt'%isenGrp)
             if not args.cwfsoff:
+                zcfile = os.path.join(outdir, 'cwfs_grp%d.txt'%isenGrp)
                 # run cwfs
                 stamp = cwfsImage(os.path.join(imgdir, fileList[0]), [0, 0], '')
                 stampSize = stamp.sizeinPix
                 parallelCwfs(imgdir, fileList, isenGrp, fileSNR, fileType, args.snrcut, outerR,
                                 stampSize, args.numproc, args.debugLevel, zcfile, pairListFile)
-            # read in cwfs results
-            zcarray = np.loadtxt(zcfile)
-            
+            for isolu in range(2):
+                if not args.deszcfitsoff:
+                    zcfile = os.path.join(outdir, 'deszc%d_grp%d.txt'%(isolu, isenGrp))
+                    readDESzcfits(pairListFile, zcfile)
+                        
         # plot zc
-        plotComp()
-
-def plotComp():
+        plotComp(outdir)
+        
+            
+def plotComp(outdir):
     
     x = range(4, znmax + 1)
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12,10))
     for isenGrp in range(4):
             
-        ax = plt.subplot(2, 2 , isenGrp+1)
+        # read in cwfs results
+        zcfile = os.path.join(outdir, 'cwfs_grp%d.txt'%isenGrp)
+        zcarray = np.loadtxt(zcfile)
+        #filter out those with caustic warning
+        zcarray = zcarray[zcarray[:,-1]==0, 0:-1]
         npair = zcarray.shape[0]
+        # read in DES results
+        deszc0file = os.path.join(outdir, 'deszc0_grp%d.txt'%(isenGrp))
+        deszc1file = os.path.join(outdir, 'deszc1_grp%d.txt'%(isenGrp))
+        deszc0 = np.loadtxt(deszc0file)*1e3
+        deszc1 = np.loadtxt(deszc1file)*1e3
+        #filter out the nan
+        deszc0 = deszc0[np.isnan(deszc0[:,0])==False,:]
+        deszc1 = deszc1[np.isnan(deszc1[:,0])==False,:]
+        nzc0 = deszc0.shape[0]
+        nzc1 = deszc1.shape[1]
+        
+        #plt.subplot(2, 2 , isenGrp+1)
+        icol = isenGrp%2
+        irow = np.int8(np.floor(isenGrp/2))
         for ipair in range(npair):
-            plt.plot(x, zcarray[ipair, :], # label = '',
-                    marker='.', color='r', markersize=10, linestyle='--')
-        plt.xlabel('Zernike index')
-        plt.ylabel('Coefficients (nm)')
-        #ihdu[0].header['ZERN%d'%2]
+            if ipair == 0:
+                axes[irow, icol].plot(x, zcarray[ipair, :], label = 'LSST All Pairs',
+                        marker='.', color='r', markersize=5, linestyle='--')
+            else:
+                axes[irow, icol].plot(x, zcarray[ipair, :], # label = '',
+                        marker='.', color='r', markersize=5, linestyle='--')
+        for izc0 in range(npair):
+            if izc0 == 0:
+                axes[irow, icol].plot(x, deszc0[izc0, :], label = 'DES All z4-11',
+                        marker='.', color='b', markersize=5, linestyle='--')
+            else:
+                axes[irow, icol].plot(x, deszc0[izc0, :], # label = '',
+                        marker='.', color='b', markersize=5, linestyle='--')
+        for izc1 in range(npair):
+            if izc1 == 0:
+                axes[irow, icol].plot(x, deszc1[izc1, :], label = 'DES All z4-11,14,15',
+                        marker='.', color='g', markersize=5, linestyle='--')
+            else:
+                axes[irow, icol].plot(x, deszc1[izc1, :], # label = '',
+                        marker='.', color='g', markersize=5, linestyle='--')
+        axes[irow, icol].plot(x, np.mean(zcarray, axis=0), label = 'LSST Ave.',
+                marker='v', color='r', markersize=8, linewidth=4)
+        axes[irow, icol].plot(x, np.mean(deszc0, axis=0), label = 'DES Ave. z4-11',
+                marker='*', color='b', markersize=15, linewidth=4)
+        axes[irow, icol].plot(x, np.mean(deszc1, axis=0), label = 'DES Ave. z4-11,14,15',
+                marker='o', color='g', markersize=8, linewidth=4)
 
+        axes[irow, icol].grid()
+        axes[irow, icol].set_xlabel('Zernike index')
+        axes[irow, icol].set_ylabel('Coefficients (nm)')
+        axes[irow, icol].legend(loc='best', framealpha = 0.5)
+        if isenGrp == 0:
+            axes[irow, icol].set_title('%s/%s, %s - %s, npair=%d'%(
+                outdir.split('/')[2],outdir.split('/')[3],
+                intraname[isenGrp], extraname[isenGrp], npair))
+        else:
+            axes[irow, icol].set_title('%s - %s, npair=%d'%(
+                intraname[isenGrp], extraname[isenGrp], npair))
+
+    plt.savefig(os.path.join(outdir, 'solution.png'))
+    
+def readDESzcfits(pairListFile, zcfile):
+    npair = sum(1 for line in open(pairListFile, 'r')) #number of lines/image pairs    
+    fidr = open(pairListFile, 'r')
+    zcI1I2 = np.zeros((npair, znmax-3, 2))*np.nan #I1,I2 separate; 
+    ipair = 0
+    for line in fidr:
+        ipair += 1
+        for ifits in range(2):
+            filename = line.split()[ifits]
+            filename = filename.replace('151209','forwardSolutions')
+            filename = filename.replace('DECam','v20/DECam')
+            if 'zc0' in zcfile:
+                isolu = 0
+                filename = filename.replace('stamp.fits','first.donut.fits.fz')
+            elif 'zc1' in zcfile:
+                isolu = 1
+                filename = filename.replace('stamp.fits','second.donut.fits.fz')
+            IHDU = fits.open(filename)
+            for zi in range(4, znmax+1):
+                try:
+                    zcI1I2[ipair-1, zi-4, ifits] = IHDU[0].header['ZERN%d'%zi]
+                except KeyError:
+                    zcI1I2[ipair-1, zi-4, ifits] = 0
+
+            if not (np.sqrt(sum(zcI1I2[ipair-1,5-4:10-4,ifits]**2))<3 and
+                    abs(zcI1I2[ipair-1,4-4,ifits])>5 and
+                    (abs(zcI1I2[ipair-1,4-4,ifits])<15)):
+                zcI1I2[ipair-1, :, ifits] = np.nan
+                print('bad DES solution for -----------  %s'%filename)
+                plt.figure(figsize=(3, 6))
+                plt.subplot(3, 1, 1)
+                plt.imshow(IHDU[1].data, origin='lower')
+                plt.axis('off')
+                plt.title('fit')
+                plt.colorbar()
+                plt.subplot(3, 1, 2)
+                plt.imshow(IHDU[2].data, origin='lower')
+                plt.axis('off')
+                plt.title('data')
+                plt.colorbar()
+                plt.subplot(3, 1, 3)
+                plt.imshow(IHDU[3].data, origin='lower')
+                plt.axis('off')
+                plt.title('data-fit')
+                plt.colorbar()
+                plt.savefig(line.split()[ifits].replace('stamp.fits','DESzc%d.png'%isolu))
+                
+            IHDU.close()
+
+    #get rid of the large z4 terms in Roodman's results                
+    avez4 = np.zeros(2)*np.nan
+    for ifits in range(2):
+        #average all the z4 for I1, then for I2, across npair
+        idx = np.isnan(zcI1I2[:, 4-4, ifits]) == False
+        avez4[ifits]=np.mean(zcI1I2[idx, 4-4, ifits])
+    for ifits in range(2):
+        idx = np.isnan(zcI1I2[:, 4-4, ifits]) == False
+        zcI1I2[idx, 4-4, ifits] = np.mean(avez4)
+
+    zcI1I2DES = np.zeros((npair*2, znmax-3))
+    for ipair in range(npair):
+        for ifits in range(2):
+            zcI1I2DES[ipair*2+ifits, :] = zcI1I2[ipair, :, ifits]
+
+    np.savetxt(zcfile, zcI1I2DES)
 
 def readSNRfile(snrfile):
     fileSNR = []
@@ -170,7 +294,7 @@ def runcwfs(argList):
     algo.reset(I1, I2)
     algo.runIt(inst, I1, I2, model)
 
-    return algo.zer4UpNm
+    return np.append(algo.zer4UpNm, algo.caustic)
     
 def plotExampleDonuts(fileList, fileType, fileSNR, snrcut, pngfile, imgdir):
     # take a look at some example images 
