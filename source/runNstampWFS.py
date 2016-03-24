@@ -21,7 +21,7 @@ def main():
     parser = argparse.ArgumentParser(
         description='----- runNstampWFS.py ---------')
     parser.add_argument('snrcut', type=float, help='threshold on SNR')
-    parser.add_argument('-expid', dest='expid', default=-1, type=int,
+    parser.add_argument('-startid', dest='startid', default=-1, type=int,
                         help='exposure ID; default = -1, run over everything')
     parser.add_argument('-snroff', help='w/o recalculating SNR of images',
                         action='store_true')
@@ -57,7 +57,7 @@ def main():
         print(outerR)
             
     for expid in expidList:
-        if (args.expid>0 and int(expid) !=args.expid):
+        if (args.startid>0 and int(expid) <args.startid):
             continue
         imgdir = os.path.join(rvddate, dataset, expid)
         outdir = os.path.join('output', imgdir)
