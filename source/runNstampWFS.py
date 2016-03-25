@@ -228,6 +228,7 @@ def readDESzcfits(pairListFile, zcfile):
                 
             IHDU.close()
 
+    fidr.close()
     #get rid of the large z4 terms in Roodman's results                
     avez4 = np.zeros(2)*np.nan
     for ifits in range(2):
