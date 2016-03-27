@@ -180,7 +180,9 @@ def plotComp(outdir):
     plt.savefig(os.path.join(outdir, 'solution.png'))
     
 def readDESzcfits(pairListFile, zcfile):
-    npair = sum(1 for line in open(pairListFile, 'r')) #number of lines/image pairs    
+    fidr = open(pairListFile, 'r')
+    npair = sum(1 for line in fidr) #number of lines/image pairs
+    fidr.close()
     fidr = open(pairListFile, 'r')
     zcI1I2 = np.zeros((npair, znmax-3, 2))*np.nan #I1,I2 separate; 
     ipair = 0
