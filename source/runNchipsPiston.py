@@ -108,8 +108,8 @@ def main():
                             stampSize, args.numproc, args.debugLevel, zcfile, pairListFile)
         for isolu in range(2):
             if not args.deszcfitsoff:
-                zcfile = os.path.join(outdir, 'deszc%d_grp%d.txt'%(isolu, isenGrp))
-                readDESzcfits(pairListFile, zcfile)
+                zcfile = os.path.join(outdir[0], 'deszc%d.txt'%(isolu))
+                readDESzcfits(pairListFile, zcfile, args.dl)
                         
         # plot zc
         plotComp(outdir)
@@ -118,14 +118,12 @@ def main():
 def plotComp(outdir):
     
     x = range(4, znmax + 1)
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12,10))
-    for isenGrp in range(4):
-            
-        #plt.subplot(2, 2 , isenGrp+1)
-        icol = isenGrp%2
-        irow = np.int8(np.floor(isenGrp/2))
+    plt.figure(figsize=(15,15))
+    for isenGrp in range(2):
+        for isensor in range(nsensor):
+
         # read in cwfs results
-        zcfile = os.path.join(outdir, 'cwfs_grp%d.txt'%isenGrp)
+        zcfile = os.path.join(outdir[0], 'cwfs_grp%d.txt'%isenGrp)
         zcarray = np.loadtxt(zcfile)
         
         #filter out those with caustic warning
@@ -198,7 +196,7 @@ def plotComp(outdir):
 
     plt.savefig(os.path.join(outdir, 'solution.png'))
     
-def readDESzcfits(pairListFile, zcfile):
+def readDESzcfits(pairListFile, zcfile, dl):
     fidr = open(pairListFile, 'r')
     npair = sum(1 for line in fidr) #number of lines/image pairs
     fidr.close()
@@ -224,9 +222,14 @@ def readDESzcfits(pairListFile, zcfile):
                 except KeyError:
                     zcI1I2[ipair-1, zi-4, ifits] = 0
 
+            z4low = 5
+            z4high = 15
+            if abs(dl - 3.0)< 1e-4:
+                z4low = 10
+                z4high = 30
             if not (np.sqrt(sum(zcI1I2[ipair-1,5-4:10-4,ifits]**2))<3 and
-                    abs(zcI1I2[ipair-1,4-4,ifits])>5 and
-                    (abs(zcI1I2[ipair-1,4-4,ifits])<15)):
+                    abs(zcI1I2[ipair-1,4-4,ifits])>z4low and
+                    (abs(zcI1I2[ipair-1,4-4,ifits])<z4high)):
                 zcI1I2[ipair-1, :, ifits] = np.nan
                 print('bad DES solution for -----------  %s'%filename)
                 plt.figure(figsize=(3, 6))
