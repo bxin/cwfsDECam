@@ -23,6 +23,8 @@ def main():
     parser.add_argument('snrcut', type=float, help='threshold on SNR')
     parser.add_argument('-startid', dest='startid', default=-1, type=int,
                         help='exposure ID; default = -1, run over everything')
+    parser.add_argument('-endid', dest='endid', default=1e10, type=int,
+                        help='exposure ID; default = 1e10, run over everything')
     parser.add_argument('-snroff', help='w/o recalculating SNR of images',
                         action='store_true')
     parser.add_argument('-cwfsoff', help='w/o running cwfs',
@@ -55,16 +57,20 @@ def main():
     outerR = inst.donutR/inst.pixelSize
     if args.debugLevel >= 0:
         print(outerR)
-            
+
+    iexp = 0
     for expid in expidList:
+        iexp = iexp + 1
         if (args.startid>0 and int(expid) <args.startid):
+            continue
+        if (int(expid) > args.endid):
             continue
         imgdir = os.path.join(rvddate, dataset, expid)
         outdir = os.path.join('output', imgdir)
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
         if args.debugLevel >= 0:
-            print(expid, imgdir)
+            print(iexp, ': -----', expid, imgdir)
 
         snrfile = os.path.join(outdir, 'snr.txt')
         if not args.snroff:
@@ -93,10 +99,17 @@ def main():
                     readDESzcfits(pairListFile, zcfile)
                         
         # plot zc
-        plotComp(outdir)
+        failStatFile = os.path.join(outdir, 'failStat.txt')
+        plotComp(outdir, failStatFile)
         
             
-def plotComp(outdir):
+def plotComp(outdir, failStatFile):
+    
+    failStat = np.zeros((12, 3))
+    # caustic, 0, total
+    # zc0fail, zc0missing, zc0total
+    # zc1fail, zc1missing, zc1total
+    # repeat above 4 times for 4 sensor groups
     
     x = range(4, znmax + 1)
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12,10))
@@ -108,11 +121,20 @@ def plotComp(outdir):
         # read in cwfs results
         zcfile = os.path.join(outdir, 'cwfs_grp%d.txt'%isenGrp)
         zcarray = np.loadtxt(zcfile)
+        if (zcarray.shape[0]>0):
+            if zcarray.ndim == 1:
+                temp = np.zeros((1, zcarray.shape[0]))
+                temp[0, :] = zcarray
+                zcarray = temp
+            failStat[isenGrp*3, 0] = sum(zcarray[:,-1]>0.5) #caustic flag
+            failStat[isenGrp*3, 2] = zcarray.shape[0]
         
-        #filter out those with caustic warning
-        try:
+            #filter out those with caustic warning
             zcarray = zcarray[zcarray[:,-1]==0, 0:-1]
-        except IndexError: #when zcarray is empty, no donuts with snr>snrcut
+        else:
+            failStat[isenGrp*3:isenGrp*3+3, 0] = 0
+            failStat[isenGrp*3:isenGrp*3+3, 2] = 1e-3 #so that later in Matlab we don't divide by 0
+
             npair = 0
             if isenGrp == 0:
                 axes[irow, icol].set_title('%s/%s, %s - %s, npair=%d'%(
@@ -127,11 +149,20 @@ def plotComp(outdir):
         # read in DES results
         deszc0file = os.path.join(outdir, 'deszc0_grp%d.txt'%(isenGrp))
         deszc1file = os.path.join(outdir, 'deszc1_grp%d.txt'%(isenGrp))
-        deszc0 = np.loadtxt(deszc0file)*1e3
-        deszc1 = np.loadtxt(deszc1file)*1e3
-        #filter out the nan
-        deszc0 = deszc0[np.isnan(deszc0[:,0])==False,:]
-        deszc1 = deszc1[np.isnan(deszc1[:,0])==False,:]
+        deszc0 = np.loadtxt(deszc0file)
+        deszc1 = np.loadtxt(deszc1file)
+        failStat[isenGrp*3+1, 0] = sum((deszc0[:,0]>1e8) & (deszc0[:,0]<1.5e10))
+        failStat[isenGrp*3+1, 1] = sum(deszc0[:,0]>1.5e10) #missing files
+        failStat[isenGrp*3+1, 2] = deszc0.shape[0]
+        failStat[isenGrp*3+2, 0] = sum((deszc1[:,0]>1e8) & (deszc1[:,0]<1.5e10))
+        failStat[isenGrp*3+2, 1] = sum(deszc1[:,0]>1.5e10) #missing files
+        failStat[isenGrp*3+2, 2] = deszc1.shape[0]
+        
+        deszc0 = deszc0*1e3 #convert to nm
+        deszc1 = deszc1*1e3 #convert to nm
+        #filter out the xe10
+        deszc0 = deszc0[deszc0[:,0]<1e8,:]
+        deszc1 = deszc1[deszc1[:,0]<1e8,:]
         nzc0 = deszc0.shape[0]
         nzc1 = deszc1.shape[0]
         
@@ -162,6 +193,11 @@ def plotComp(outdir):
                 marker='*', color='b', markersize=15, linewidth=4)
         axes[irow, icol].plot(x, np.mean(deszc1, axis=0), label = 'DES Ave. z4-11,14,15',
                 marker='o', color='g', markersize=8, linewidth=4)
+        
+        np.savetxt(os.path.join(outdir, 'ave_grp%d.txt'%isenGrp),
+                   np.vstack((np.mean(zcarray, axis=0),
+                              np.mean(deszc0, axis=0),
+                              np.mean(deszc1, axis=0))))
 
         axes[irow, icol].grid()
         axes[irow, icol].set_xlabel('Zernike index')
@@ -176,8 +212,8 @@ def plotComp(outdir):
             axes[irow, icol].set_title('%s - %s, npair=%d'%(
                 intraname[isenGrp], extraname[isenGrp], npair))
             
-
     plt.savefig(os.path.join(outdir, 'solution.png'))
+    np.savetxt(failStatFile, failStat)
     
 def readDESzcfits(pairListFile, zcfile):
     fidr = open(pairListFile, 'r')
@@ -198,47 +234,52 @@ def readDESzcfits(pairListFile, zcfile):
             elif 'zc1' in zcfile:
                 isolu = 1
                 filename = filename.replace('stamp.fits','second.donut.fits.fz')
-            IHDU = fits.open(filename)
-            for zi in range(4, znmax+1):
-                try:
-                    zcI1I2[ipair-1, zi-4, ifits] = IHDU[0].header['ZERN%d'%zi]
-                except KeyError:
-                    zcI1I2[ipair-1, zi-4, ifits] = 0
+            try:
+                IHDU = fits.open(filename)
+                for zi in range(4, znmax+1):
+                    try:
+                        zcI1I2[ipair-1, zi-4, ifits] = IHDU[0].header['ZERN%d'%zi]
+                    except KeyError:
+                        zcI1I2[ipair-1, zi-4, ifits] = 0
 
-            if not (np.sqrt(sum(zcI1I2[ipair-1,5-4:10-4,ifits]**2))<3 and
-                    abs(zcI1I2[ipair-1,4-4,ifits])>5 and
-                    (abs(zcI1I2[ipair-1,4-4,ifits])<15)):
-                zcI1I2[ipair-1, :, ifits] = np.nan
-                print('bad DES solution for -----------  %s'%filename)
-                plt.figure(figsize=(3, 6))
-                plt.subplot(3, 1, 1)
-                plt.imshow(IHDU[1].data, origin='lower')
-                plt.axis('off')
-                plt.title('fit')
-                plt.colorbar()
-                plt.subplot(3, 1, 2)
-                plt.imshow(IHDU[2].data, origin='lower')
-                plt.axis('off')
-                plt.title('data')
-                plt.colorbar()
-                plt.subplot(3, 1, 3)
-                plt.imshow(IHDU[3].data, origin='lower')
-                plt.axis('off')
-                plt.title('data-fit')
-                plt.colorbar()
-                plt.savefig(line.split()[ifits].replace('stamp.fits','DESzc%d.png'%isolu))
+                if not (np.sqrt(sum(zcI1I2[ipair-1,5-4:10-4,ifits]**2))<3 and
+                        abs(zcI1I2[ipair-1,4-4,ifits])>5 and
+                        (abs(zcI1I2[ipair-1,4-4,ifits])<15)):
+                    zcI1I2[ipair-1, :, ifits] = 1e10
+                    print('bad DES solution for -----------  %s'%filename)
+                    plt.figure(figsize=(3, 6))
+                    plt.subplot(3, 1, 1)
+                    plt.imshow(IHDU[1].data, origin='lower')
+                    plt.axis('off')
+                    plt.title('fit')
+                    plt.colorbar()
+                    plt.subplot(3, 1, 2)
+                    plt.imshow(IHDU[2].data, origin='lower')
+                    plt.axis('off')
+                    plt.title('data')
+                    plt.colorbar()
+                    plt.subplot(3, 1, 3)
+                    plt.imshow(IHDU[3].data, origin='lower')
+                    plt.axis('off')
+                    plt.title('data-fit')
+                    plt.colorbar()
+                    plt.savefig(line.split()[ifits].replace('stamp.fits','DESzc%d.png'%isolu))
                 
-            IHDU.close()
+                IHDU.close()
+            except FileNotFoundError:
+                print('missing DES file -----------  %s'%filename)
+                for zi in range(4, znmax+1):
+                    zcI1I2[ipair-1, zi-4, ifits] = 2e10          
 
     fidr.close()
     #get rid of the large z4 terms in Roodman's results                
     avez4 = np.zeros(2)*np.nan
     for ifits in range(2):
         #average all the z4 for I1, then for I2, across npair
-        idx = np.isnan(zcI1I2[:, 4-4, ifits]) == False
+        idx = (zcI1I2[:, 4-4, ifits]<1e8)
         avez4[ifits]=np.mean(zcI1I2[idx, 4-4, ifits])
     for ifits in range(2):
-        idx = np.isnan(zcI1I2[:, 4-4, ifits]) == False
+        idx = (zcI1I2[:, 4-4, ifits]<1e8)
         zcI1I2[idx, 4-4, ifits] = np.mean(avez4)
 
     zcI1I2DES = np.zeros((npair*2, znmax-3))
