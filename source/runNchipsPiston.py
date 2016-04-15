@@ -94,6 +94,7 @@ def main():
             if not args.snroff:
                 getSNRandType(snrfile[itra], traname[itra],
                     imgdir[itra], outerR, inst.obscuration, args.debugLevel)
+        continue
         fileSNR, fileType, fileList = readSNRfile(snrfile)
 
         if not args.plotsoff:

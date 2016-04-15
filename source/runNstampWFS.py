@@ -76,12 +76,13 @@ def main():
         if not args.snroff:
             getSNRandType(snrfile,
                 imgdir, outerR, inst.obscuration, args.debugLevel)
+        continue
         fileSNR, fileType, fileList = readSNRfile(snrfile)
 
         if not args.plotsoff:
-            plotSNR(fileSNR, fileType, args.snrcut,
+            plotSNR(fileSNR, fileType, fileList, args.snrcut,
                     os.path.join(outdir, 'snr.png'))
-            plotExampleDonuts(fileList, fileType, fileSNR, args.snrcut,
+            plotExampleDonuts(fileSNR, fileType, fileList, args.snrcut,
                               os.path.join(outdir, 'donuts.png'), imgdir)
 
         for isenGrp in range(4):
@@ -358,7 +359,7 @@ def runcwfs(argList):
 
     return np.append(algo.zer4UpNm, algo.caustic)
     
-def plotExampleDonuts(fileList, fileType, fileSNR, snrcut, pngfile, imgdir):
+def plotExampleDonuts(fileSNR, fileType, fileList, snrcut, pngfile, imgdir):
     # take a look at some example images 
     # plot 3 pairs from each sensor group    
     nplot = 3
@@ -428,7 +429,14 @@ def getSNRandType(snrfile, imgdir, outerR, obsR, debugLevel):
                    (filename, fileType, stamp.SNR, stamp.SNRsig, stamp.SNRbg))
     fidw.close()
             
-def plotSNR(fileSNR, fileType, snrcut, pngfile):
+def plotSNR(fileSNR, fileType, fileList, snrcut, pngfile):
+
+    # set the saturated images to SNR=1e-5
+    idx = fileSNR<0
+    nsat = sum(idx)
+    for i in range(nsat):
+        print(fileList[i])
+        
     for isenGrp in range(4):
         plt.subplot(2, 2, isenGrp+1)
         intraIdx = np.array([x=='intra%d'%isenGrp for x in fileType])
