@@ -21,8 +21,9 @@ znmax = 22
 def main():
     parser = argparse.ArgumentParser(
         description='----- runNchipsPiston.py ---------')
-    parser.add_argument('snrcut', type=float, help='threshold on SNR')
     parser.add_argument('dl', type=float, help='image space offset')
+    parser.add_argument('-snrcut', dest='snrcut', default=20, type=float,
+                        help='threshold on SNR; default=20')
     parser.add_argument('-startid0', dest='startid0', default=-1, type=int,
                         help='exposure ID; default = -1, run over everything')
     parser.add_argument('-endid0', dest='endid0', default=1e10, type=int,
@@ -45,20 +46,19 @@ def main():
     if args.debugLevel >= 1:
         print(args)
 
-    rvddate = '151209'
     dataset = ['', '']
     if abs(args.dl - 3.0)< 1e-4:
-        dataset[0] = '20140807s2'
-        dataset[1] = '20140807s3'
+        dataset[0] = 'data/camPiston/20140807s2'
+        dataset[1] = 'data/camPiston/20140807s3'
     elif abs(args.dl - 1.5)< 1e-4:
-        dataset[0] = '20140807s5'
-        dataset[1] = '20140807s4'
+        dataset[0] = 'data/camPiston/20140807s5'
+        dataset[1] = 'data/camPiston/20140807s4'
 
     instruFile = 'decamHex%d'%(args.dl*10)
 
     expidList = [[], []]
     for itra in range(2):
-        expidList0 = os.listdir(os.path.join(rvddate, dataset[itra]))
+        expidList0 = os.listdir(dataset[itra])
         expidList[itra] = expidList0.copy()
         for expid in expidList0:
             if not expid.isdigit():
@@ -78,8 +78,8 @@ def main():
 
         for itra in range(2):
             expid[itra] = expidList[itra][iexp]
-            imgdir[itra] = os.path.join(rvddate, dataset[itra], expid[itra])
-            outdir[itra] = os.path.join('output', imgdir[itra])
+            imgdir[itra] = os.path.join(dataset[itra], expid[itra])
+            outdir[itra] = imgdir[itra].replace('data', 'output')
             if not os.path.isdir(outdir[itra]):
                 os.makedirs(outdir[itra])
             snrfile[itra] = os.path.join(outdir[itra], 'snr.txt')
@@ -94,7 +94,7 @@ def main():
             if not args.snroff:
                 getSNRandType(snrfile[itra], traname[itra],
                     imgdir[itra], outerR, inst.obscuration, args.debugLevel)
-        continue
+        # continue
         fileSNR, fileType, fileList = readSNRfile(snrfile)
 
         if not args.plotsoff:
@@ -132,9 +132,16 @@ def plotComp(outdir, pairListFile, failStatFile, nplot):
     
     # read in cwfs results
     zcfile = os.path.join(outdir[0], 'cwfs.txt')
-    zcarray = np.loadtxt(zcfile)
+    if os.stat(zcfile).st_size > 0:
+        zcarray = np.loadtxt(zcfile)
+    else:
+        zcarray = np.array([])
+        
     failStat[0, 0] = sum(zcarray[:,-1]>0.5) #caustic flag
     failStat[0, 2] = zcarray.shape[0]
+    # input donuts could be bad (e.g. only a edge is found on the stamp)
+    zcarray[(np.sqrt(np.sum(zcarray[:,5-4:10-4]**2,axis=1))>3000) |
+            (abs(zcarray[:,4-4])>3000),:] = 2e10
     # filter out those with caustic warning
     zcarray[zcarray[:,-1]>0.5, 0:-1] = 1e10
     zcarray = zcarray[:, 0:-1]
@@ -178,8 +185,9 @@ def plotComp(outdir, pairListFile, failStatFile, nplot):
             idx2 = np.repeat(idx, 2)
             
             plt.subplot(nrow, ncol, isensor+1)
-            npair = sum(idx)
             zcsub = zcarray[idx, :]
+            zcsub = zcsub[zcsub[:,0]<1e8,:]
+            npair = zcsub.shape[0]
             for ipair in range(npair):
                 if ipair == 0:
                     plt.plot(x, zcsub[ipair, :], label = 'LSST All Pairs',
@@ -194,8 +202,8 @@ def plotComp(outdir, pairListFile, failStatFile, nplot):
             zc1sub = zc1sub[zc1sub[:,0]<1e8,:]
             nzc0 = zc0sub.shape[0]
             nzc1 = zc1sub.shape[0]
-            zc0sub = zc0sub*1e3
-            zc1sub = zc1sub*1e3
+            zc0sub = zc0sub*700 # wavelength is 700nm
+            zc1sub = zc1sub*700
             for izc0 in range(nzc0):
                 if izc0 == 0:
                     plt.plot(x, zc0sub[izc0, :], label = 'DES All z4-11',
@@ -249,7 +257,6 @@ def readDESzcfits(pairListFile, zcfile, dl):
         ipair += 1
         for ifits in range(2):
             filename = line.split()[ifits]
-            filename = filename.replace('151209','forwardSolutions')
             filename = filename.replace('DECam','v20/DECam')
             if 'zc0' in zcfile:
                 isolu = 0
@@ -439,6 +446,7 @@ def plotExampleDonuts(fileList, fileType, fileSNR, snrcut, pngfile, imgdir):
             plt.axis('off')
             plt.title(I2title)
     plt.savefig(pngfile)
+    plt.close('all')
     
 def getSNRandType(snrfile, fileType, imgdir, outerR, obsR, debugLevel):
     fileList0 = os.listdir(imgdir)
@@ -453,7 +461,8 @@ def getSNRandType(snrfile, fileType, imgdir, outerR, obsR, debugLevel):
             print(filename)
         stamp = cwfsImage(os.path.join(imgdir, filename), [0, 0], '')
         stamp.rmBkgd(outerR, debugLevel)
-        stamp.getSNR(outerR, obsR)
+        saturation = 40000
+        stamp.getSNR(outerR, obsR, saturation)
         
         fidw.write('%s\t %s \t%7.2f \t %10.1f\t %10.1f\n'%
                    (filename, '%s%s'%(fileType, filename.split('.')[1]),
@@ -488,6 +497,7 @@ def plotSNR(fileSNR, fileType, snrcut, pngfile):
 
     plt.tight_layout()
     plt.savefig(pngfile)
+    plt.close('all')
     
 if __name__ == "__main__":
     main()

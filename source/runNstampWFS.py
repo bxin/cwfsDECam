@@ -13,14 +13,16 @@ from cwfsImage import cwfsImage
 intraname=['FN1','FN3','FS2','FS4']
 extraname=['FN2','FN4','FS1','FS3']
 instruFile = 'decam15'
-algoFile = 'exp'
+algoFile = 'exp.DESi2'
 model = 'paraxial'
 znmax = 22
 
 def main():
     parser = argparse.ArgumentParser(
         description='----- runNstampWFS.py ---------')
-    parser.add_argument('snrcut', type=float, help='threshold on SNR')
+    parser.add_argument('datadir', type=str, help='Data Dir, e.g. data/skymap/20140613s1')
+    parser.add_argument('-snrcut', dest='snrcut', default=20, type=float,
+                        help='threshold on SNR; default=20')
     parser.add_argument('-startid', dest='startid', default=-1, type=int,
                         help='exposure ID; default = -1, run over everything')
     parser.add_argument('-endid', dest='endid', default=1e10, type=int,
@@ -43,10 +45,7 @@ def main():
     if args.debugLevel >= 1:
         print(args)
 
-    rvddate = '151209'
-    dataset = '20140613s1'
-
-    expidList0 = os.listdir(os.path.join(rvddate, dataset))
+    expidList0 = os.listdir(args.datadir)
     expidList = expidList0.copy()
     for expid in expidList0:
         if not expid.isdigit():
@@ -65,8 +64,8 @@ def main():
             continue
         if (int(expid) > args.endid):
             continue
-        imgdir = os.path.join(rvddate, dataset, expid)
-        outdir = os.path.join('output', imgdir)
+        imgdir = os.path.join(args.datadir, expid)
+        outdir = imgdir.replace('data','output')
         if not os.path.isdir(outdir):
             os.makedirs(outdir)
         if args.debugLevel >= 0:
@@ -76,7 +75,7 @@ def main():
         if not args.snroff:
             getSNRandType(snrfile,
                 imgdir, outerR, inst.obscuration, args.debugLevel)
-        continue
+        # continue
         fileSNR, fileType, fileList = readSNRfile(snrfile)
 
         if not args.plotsoff:
@@ -121,7 +120,11 @@ def plotComp(outdir, failStatFile):
         irow = np.int8(np.floor(isenGrp/2))
         # read in cwfs results
         zcfile = os.path.join(outdir, 'cwfs_grp%d.txt'%isenGrp)
-        zcarray = np.loadtxt(zcfile)
+        if os.stat(zcfile).st_size > 0:
+            zcarray = np.loadtxt(zcfile)
+        else:
+            zcarray = np.array([])
+            
         if (zcarray.shape[0]>0):
             if zcarray.ndim == 1:
                 temp = np.zeros((1, zcarray.shape[0]))
@@ -130,6 +133,9 @@ def plotComp(outdir, failStatFile):
             failStat[isenGrp*3, 0] = sum(zcarray[:,-1]>0.5) #caustic flag
             failStat[isenGrp*3, 2] = zcarray.shape[0]
         
+            # input donuts could be bad (e.g. only a edge is found on the stamp)
+            zcarray[(np.sqrt(np.sum(zcarray[:,5-4:10-4]**2,axis=1))>3000) |
+                    (abs(zcarray[:,4-4])>3000),:] = 2e10
             #filter out those with caustic warning
             zcarray = zcarray[zcarray[:,-1]==0, 0:-1]
         else:
@@ -159,8 +165,8 @@ def plotComp(outdir, failStatFile):
         failStat[isenGrp*3+2, 1] = sum(deszc1[:,0]>1.5e10) #missing files
         failStat[isenGrp*3+2, 2] = deszc1.shape[0]
         
-        deszc0 = deszc0*1e3 #convert to nm
-        deszc1 = deszc1*1e3 #convert to nm
+        deszc0 = deszc0*700 #convert to nm, wavelength is 700nm
+        deszc1 = deszc1*700 #convert to nm
         #filter out the xe10
         deszc0 = deszc0[deszc0[:,0]<1e8,:]
         deszc1 = deszc1[deszc1[:,0]<1e8,:]
@@ -214,6 +220,7 @@ def plotComp(outdir, failStatFile):
                 intraname[isenGrp], extraname[isenGrp], npair))
             
     plt.savefig(os.path.join(outdir, 'solution.png'))
+    plt.close('all')
     np.savetxt(failStatFile, failStat)
     
 def readDESzcfits(pairListFile, zcfile):
@@ -227,7 +234,6 @@ def readDESzcfits(pairListFile, zcfile):
         ipair += 1
         for ifits in range(2):
             filename = line.split()[ifits]
-            filename = filename.replace('151209','forwardSolutions')
             filename = filename.replace('DECam','v20/DECam')
             if 'zc0' in zcfile:
                 isolu = 0
@@ -265,6 +271,7 @@ def readDESzcfits(pairListFile, zcfile):
                     plt.title('data-fit')
                     plt.colorbar()
                     plt.savefig(line.split()[ifits].replace('stamp.fits','DESzc%d.png'%isolu))
+                    plt.close('all')
                 
                 IHDU.close()
             except FileNotFoundError:
@@ -331,10 +338,12 @@ def parallelCwfs(imgdir, fileList, isenGrp, fileSNR, fileType, snrcut, outerR,
         stamp.normalizeI(outerR, inst.obscuration)
         I2Array = stamp.image
         
-        # test, pdb cannot go into the subprocess
-        # runcwfs(I1Array, I2Array, inst, algo)
         argList.append((I1Array, I2Array, inst, algo))
         fidw.write('%s\t%s\n'%(I1File, I2File))
+
+        # test, pdb cannot go into the subprocess
+        # aa = runcwfs(argList[0])
+        
     fidw.close()
     pool = multiprocessing.Pool(numproc)
     zcarray = pool.map(runcwfs, argList)
@@ -402,6 +411,7 @@ def plotExampleDonuts(fileSNR, fileType, fileList, snrcut, pngfile, imgdir):
             plt.axis('off')
             plt.title(I2title)
     plt.savefig(pngfile)
+    plt.close('all')
     
 def getSNRandType(snrfile, imgdir, outerR, obsR, debugLevel):
     fileList0 = os.listdir(imgdir)
@@ -416,7 +426,19 @@ def getSNRandType(snrfile, imgdir, outerR, obsR, debugLevel):
             print(filename)
         stamp = cwfsImage(os.path.join(imgdir, filename), [0, 0], '')
         stamp.rmBkgd(outerR, debugLevel)
-        stamp.getSNR(outerR, obsR)
+        saturation = 40000
+        if ('FS4' in filename):
+            IHDU = fits.open(os.path.join(imgdir, filename))
+            if IHDU[0].header['IX']>1024:
+                saturation = 5000
+            IHDU.close()
+        elif ('FN2' in filename):
+            IHDU = fits.open(os.path.join(imgdir, filename))
+            if IHDU[0].header['IX']<1024:
+                saturation = 5000
+            IHDU.close()
+            
+        stamp.getSNR(outerR, obsR, saturation)
         for isenGrp in range(len(intraname)):
             if intraname[isenGrp] in filename:
                 fileType = ('intra%d'%isenGrp)
@@ -457,6 +479,7 @@ def plotSNR(fileSNR, fileType, fileList, snrcut, pngfile):
                                           extraname[isenGrp], npair))
     plt.tight_layout()
     plt.savefig(pngfile)
+    plt.close('all')
     
 if __name__ == "__main__":
     main()
