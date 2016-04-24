@@ -18,7 +18,7 @@ for i = 1:size(expIdList,1)
     end
 end
 
-znmax = 22;
+znmax = 15;
 cwfs = zeros(4, nexp, znmax-3);
 zc0 = zeros(4, nexp, znmax-3);
 zc1 = zeros(4, nexp, znmax-3);
@@ -31,9 +31,9 @@ for i = 1:size(expIdList,1)
             filename=sprintf('%s/%s/ave_grp%d.txt',dataset,expIdList(i).name,isenGrp);
             if exist(filename, 'file')
                 data = load(filename);
-                cwfs(isenGrp+1, iexp, :) =  data(1,:);
-                zc0(isenGrp+1, iexp, :) =  data(2,:);
-                zc1(isenGrp+1, iexp, :) =  data(3,:);
+                cwfs(isenGrp+1, iexp, :) =  data(1,1:znmax-3);
+                zc0(isenGrp+1, iexp, :) =  data(2,1:znmax-3);
+                zc1(isenGrp+1, iexp, :) =  data(3,1:znmax-3);
             else
                 cwfs(isenGrp+1, iexp, :) =  nan;
                 zc0(isenGrp+1, iexp, :) =  nan;
@@ -180,6 +180,45 @@ elseif strcmp(plotStyle, 'history')
         legend({'FM','LSST'},'location','best');
     end
     
+elseif strcmp(plotStyle, 'history1')
+    x=1:nexp;
+    figure(1);clf; %zc0
+    for iz=4:znmax
+        subplot(3,4,iz-3);
+        fm=mean(squeeze(zc0(:, :, iz-3)));
+        cw=mean(squeeze(cwfs(:,:, iz-3)));
+        idxfm = ~isnan(fm);
+        idxcw = ~isnan(cw);
+        idx = (idxfm & idxcw);
+        myrms = rms(fm(idx)-cw(idx));
+        xfm = x(idxfm);
+        fm=fm(idxfm);
+        xcw=x(idxcw);
+        cw=cw(idxcw);
+        plot(xfm, fm, '-ro', xcw, cw, '-b*');
+        grid on;
+        title(sprintf('z%d (rms diff=%3.0fnm)',iz, myrms));
+        legend({'FM','LSST'},'location','best');
+    end
+    figure(2);clf; %zc1
+    for iz=4:znmax
+        subplot(3,4,iz-3);
+        fm=mean(squeeze(zc1(:, :, iz-3)));
+        cw=mean(squeeze(cwfs(:,:, iz-3)));
+        idxfm = ~isnan(fm);
+        idxcw = ~isnan(cw);
+        idx = (idxfm & idxcw);
+        myrms = rms(fm(idx)-cw(idx));
+        xfm = x(idxfm);
+        fm=fm(idxfm);
+        xcw=x(idxcw);
+        cw=cw(idxcw);
+        plot(xfm, fm, '-ro', xcw, cw, '-b*');
+        grid on;
+        title(sprintf('z%d (rms diff=%3.0fnm)',iz, myrms));
+        legend({'FM','LSST'},'location','best');
+    end
+
 end
 
 end

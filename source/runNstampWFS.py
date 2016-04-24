@@ -15,7 +15,7 @@ extraname=['FN2','FN4','FS1','FS3']
 instruFile = 'decam15'
 algoFile = 'exp.DESi2'
 model = 'paraxial'
-znmax = 22
+znmax = 15
 
 def main():
     parser = argparse.ArgumentParser(
