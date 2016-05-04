@@ -454,10 +454,10 @@ def getSNRandType(snrfile, imgdir, outerR, obsR, debugLevel):
 def plotSNR(fileSNR, fileType, fileList, snrcut, pngfile):
 
     # set the saturated images to SNR=1e-5
-    idx = fileSNR<0
-    nsat = sum(idx)
-    for i in range(nsat):
-        print(fileList[i])
+    for i in range(fileSNR.shape[0]):
+        if fileSNR[i] < 0:
+            print(fileList[i])
+            fileSNR[i] = 1e-5
         
     for isenGrp in range(4):
         plt.subplot(2, 2, isenGrp+1)
