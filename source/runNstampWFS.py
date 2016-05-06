@@ -13,9 +13,10 @@ from cwfsImage import cwfsImage
 intraname=['FN1','FN3','FS2','FS4']
 extraname=['FN2','FN4','FS1','FS3']
 instruFile = 'decam15'
-algoFile = 'exp.DESi2'
+#algoFile = 'exp.DESi2'
+algoFile = 'exp'
 model = 'paraxial'
-znmax = 15
+znmax = 22
 
 def main():
     parser = argparse.ArgumentParser(

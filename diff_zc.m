@@ -1,14 +1,23 @@
-function [] = diff_zc(plotStyle)
+function [] = diff_zc(plotStyle,znmax)
 
 % dataType can only be 's1'. 
 % for 's2' and 's5', use diff_zc_NS()
 
 % plotStyle = 'diff', 'ratio', 'histogram', 'scatter', 'history'
+% quadrafoil = 0: use z4-z11; =1: use z4-z11,14,15
+% znmax = 11, 15, or 22
 
+if znmax==11
+    fmlabel = 'FM (z4-11)';
+else
+    fmlabel = 'FM (z4-11,14,15)';
+end
 % dataset = 'output/skymap/20140613s1';
 dataset = 'output/nights/20140315s1';
+% dataset = 'output/nights/20150801s1';
 
 expIdList = dir(dataset);
+%% count the number of exposures
 nexp = 0;
 for i = 1:size(expIdList,1)
     filename = sprintf('%s/%s/snr.txt',dataset,expIdList(i).name);
@@ -17,10 +26,8 @@ for i = 1:size(expIdList,1)
     end
 end
 
-znmax = 15;
 cwfs = zeros(4, nexp, znmax-3);
-zc0 = zeros(4, nexp, znmax-3);
-zc1 = zeros(4, nexp, znmax-3);
+fmzc = zeros(4, nexp, znmax-3);
 iexp = 0;
 for i = 1:size(expIdList,1)
     filename = sprintf('%s/%s/snr.txt',dataset,expIdList(i).name);
@@ -30,78 +37,54 @@ for i = 1:size(expIdList,1)
             filename=sprintf('%s/%s/ave_grp%d.txt',dataset,expIdList(i).name,isenGrp);
             if exist(filename, 'file')
                 data = load(filename);
-                cwfs(isenGrp+1, iexp, :) =  data(1,1:znmax-3);
-                zc0(isenGrp+1, iexp, :) =  data(2,1:znmax-3);
-                zc1(isenGrp+1, iexp, :) =  data(3,1:znmax-3);
+                zread = [0 0 0 data(1,:)];
+                if znmax == 11
+                    znew = z2z(zread,0.3396, 0 , znmax);
+                    cwfs(isenGrp+1, iexp, :) = znew(4:end);
+                    fmzc(isenGrp+1, iexp, :) =  data(2,1:znmax-3);
+                elseif znmax == 15
+                    znew = z2z(zread,0.3396, 0 , [1:11 14:15]);
+                    cwfs(isenGrp+1, iexp, :) = znew(4:end);
+                    fmzc(isenGrp+1, iexp, :) =  data(3,1:znmax-3);
+                elseif znmax == 22
+                    cwfs(isenGrp+1, iexp, :) = zread(4:end);
+                    fmzc(isenGrp+1, iexp, :) =  data(3,1:znmax-3);
+                end
             else
                 cwfs(isenGrp+1, iexp, :) =  nan;
-                zc0(isenGrp+1, iexp, :) =  nan;
-                zc1(isenGrp+1, iexp, :) =  nan;
+                fmzc(isenGrp+1, iexp, :) =  nan;
             end
         end
     end
 end
 
 if strcmp(plotStyle, 'diff')
-    % first - cwfs
     figure(1);clf;
     for isenGrp=0:3
         subplot(2,2,isenGrp+1);
-        plot(4:znmax, squeeze(zc0(isenGrp+1, :, :) - cwfs(isenGrp+1, :, :))','o');
+        plot(4:znmax, squeeze(fmzc(isenGrp+1, :, :) - cwfs(isenGrp+1, :, :))','o');
         xlim([4-0.5 znmax+0.5]);
         grid on;
         xlabel('Zernike Number');ylabel('coefficient (in nm)');
-        title('FM (z4-11) - cwfs');
-    end
-    % second - cwfs
-    figure(2);clf;
-    for isenGrp=0:3
-        subplot(2,2,isenGrp+1);
-        plot(4:znmax, squeeze(zc1(isenGrp+1, :, :) - cwfs(isenGrp+1, :, :))','o');
-        xlim([4-0.5 znmax+0.5]);
-        grid on;
-        xlabel('Zernike Number');ylabel('coefficient (in nm)');
-        title('FM (z4-11, 14,15) - cwfs');
+        title(sprintf('%s - cwfs',fmlabel));
     end
 elseif strcmp(plotStyle, 'ratio')
-    % first/cwfs
     figure(1);clf;
     for isenGrp=0:3
         subplot(2,2,isenGrp+1);
-        plot(4:znmax, squeeze(zc0(isenGrp+1, :, :)./cwfs(isenGrp+1, :, :))','o');
+        plot(4:znmax, squeeze(fmzc(isenGrp+1, :, :)./cwfs(isenGrp+1, :, :))','o');
         xlim([4-0.5 znmax+0.5]);
         ylim([-10 10]);
         grid on;
-        title('FM (z4-11) / cwfs');
-    end
-    % second/cwfs
-    figure(2);clf;
-    for isenGrp=0:3
-        subplot(2,2,isenGrp+1);
-        plot(4:znmax, squeeze(zc1(isenGrp+1, :, :)./cwfs(isenGrp+1, :, :))','o');
-        xlim([4-0.5 znmax+0.5]);
-        ylim([-10 10]);
-        grid on;
-        title('FM (z4-11, 14,15) / cwfs');
+        title(sprintf('%s / cwfs',fmlabel));
     end
 elseif strcmp(plotStyle, 'histogram')
-    % first - cwfs, by Zernike
+    % fm - cwfs, by Zernike
     xbin = -500:50:500;
     figure(1);clf; %zc0
     for iz=4:znmax
         subplot(5,4,iz-3);
-        aa=hist(reshape(squeeze(zc0(:, :, iz-3) - cwfs(:, :, iz-3)),[], ...
-            1),xbin);
-        aa=aa/(sum(aa))*100;
-        bar(xbin,aa);
-        xlim([-1000 1000]);
-        grid on;
-        title(sprintf('z%d (in %%)',iz));
-    end
-    figure(2);clf; %zc1
-    for iz=4:znmax
-        subplot(5,4,iz-3);
-        aa=hist(reshape(squeeze(zc1(:, :, iz-3) - cwfs(:, :, iz-3)),[], ...
+        aa=hist(reshape(squeeze(fmzc(:, :, iz-3) - cwfs(:, :, iz-3)),[], ...
             1),xbin);
         aa=aa/(sum(aa))*100;
         bar(xbin,aa);
@@ -110,23 +93,13 @@ elseif strcmp(plotStyle, 'histogram')
         title(sprintf('z%d (in %%)',iz));
     end
 elseif strcmp(plotStyle, 'scatter')
-    % scatter(first, cwfs), by Zernike
+    % scatter(fm, cwfs), by Zernike
     xlow = -1000;
     xhigh = 1000;
     figure(1);clf; %zc0
     for iz=4:znmax
         subplot(5,4,iz-3);
-        scatter(reshape(squeeze(zc0(:, :, iz-3)),[],1), reshape(cwfs(:, :, iz-3),[],1),180,'.');
-        line([xlow, xhigh],[xlow, xhigh],'color','r');
-        xlim([-1000 1000]);
-        grid on;
-        title(sprintf('z%d (in nm)',iz));
-        xlabel('FM'); ylabel('LSST');
-    end
-    figure(2);clf; %zc1
-    for iz=4:znmax
-        subplot(5,4,iz-3);
-        scatter(reshape(squeeze(zc1(:, :, iz-3)),[],1), reshape(cwfs(:, :, iz-3),[],1),180,'.');
+        scatter(reshape(squeeze(fmzc(:, :, iz-3)),[],1), reshape(cwfs(:, :, iz-3),[],1),50,'.');
         line([xlow, xhigh],[xlow, xhigh],'color','r');
         xlim([-1000 1000]);
         grid on;
@@ -135,16 +108,13 @@ elseif strcmp(plotStyle, 'scatter')
     end
 elseif strcmp(plotStyle, 'history')
     for iz=4:znmax
-        plot_zn_history(1,iz, zc0, cwfs);
-        plot_zn_history(2,iz, zc1, cwfs);
+        plot_zn_history(1,iz, fmzc, cwfs);
         if iz==5
-            zc0 = subtract_misalign(zc0);
-            zc1 = subtract_misalign(zc1);
+            fmzc = subtract_misalign(fmzc);
             cwfs = subtract_misalign(cwfs);
         end
         if (iz==5 || iz==6)
-            plot_zn_history(3,iz, zc0, cwfs);
-            plot_zn_history(4,iz, zc1, cwfs);
+            plot_zn_history(2,iz, fmzc, cwfs);
         end
     end
     
@@ -153,7 +123,7 @@ elseif strcmp(plotStyle, 'history1')
     figure(1);clf; %zc0
     for iz=4:znmax
         subplot(3,4,iz-3);
-        fm=mean(squeeze(zc0(:, :, iz-3)));
+        fm=mean(squeeze(fmzc(:, :, iz-3)));
         cw=mean(squeeze(cwfs(:,:, iz-3)));
         idxfm = ~isnan(fm);
         idxcw = ~isnan(cw);
@@ -168,25 +138,6 @@ elseif strcmp(plotStyle, 'history1')
         title(sprintf('z%d (rms diff=%3.0fnm)',iz, myrms));
         legend({'FM','LSST'},'location','best');
     end
-    figure(2);clf; %zc1
-    for iz=4:znmax
-        subplot(3,4,iz-3);
-        fm=mean(squeeze(zc1(:, :, iz-3)));
-        cw=mean(squeeze(cwfs(:,:, iz-3)));
-        idxfm = ~isnan(fm);
-        idxcw = ~isnan(cw);
-        idx = (idxfm & idxcw);
-        myrms = rms(fm(idx)-cw(idx));
-        xfm = x(idxfm);
-        fm=fm(idxfm);
-        xcw=x(idxcw);
-        cw=cw(idxcw);
-        plot(xfm, fm, '-ro', xcw, cw, '-b*');
-        grid on;
-        title(sprintf('z%d (rms diff=%3.0fnm)',iz, myrms));
-        legend({'FM','LSST'},'location','best');
-    end
-
 end
 
 end
