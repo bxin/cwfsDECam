@@ -457,7 +457,7 @@ def plotSNR(fileSNR, fileType, fileList, snrcut, pngfile):
     # set the saturated images to SNR=1e-5
     for i in range(fileSNR.shape[0]):
         if fileSNR[i] < 0:
-            print(fileList[i])
+            print('file: %s, SNR = %4.1f' % (fileList[i], fileSNR[i]))
             fileSNR[i] = 1e-5
         
     for isenGrp in range(4):

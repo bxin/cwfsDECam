@@ -4,17 +4,21 @@ function [] = diff_zc(plotStyle,znmax)
 % for 's2' and 's5', use diff_zc_NS()
 
 % plotStyle = 'diff', 'ratio', 'histogram', 'scatter', 'history'
-% quadrafoil = 0: use z4-z11; =1: use z4-z11,14,15
 % znmax = 11, 15, or 22
+
+dataset = 'output/skymap/20140613s1';
+% dataset = 'output/nights/20140315s1';
+% dataset = 'output/nights/20150108s1';
 
 if znmax==11
     fmlabel = 'FM (z4-11)';
+    nrow = 3;
+    ncol = 4;
 else
     fmlabel = 'FM (z4-11,14,15)';
+    nrow = 3;
+    ncol = 4;
 end
-% dataset = 'output/skymap/20140613s1';
-dataset = 'output/nights/20140315s1';
-% dataset = 'output/nights/20150801s1';
 
 expIdList = dir(dataset);
 %% count the number of exposures
@@ -98,7 +102,7 @@ elseif strcmp(plotStyle, 'scatter')
     xhigh = 1000;
     figure(1);clf; %zc0
     for iz=4:znmax
-        subplot(5,4,iz-3);
+        subplot(nrow,ncol,iz-3);
         scatter(reshape(squeeze(fmzc(:, :, iz-3)),[],1), reshape(cwfs(:, :, iz-3),[],1),50,'.');
         line([xlow, xhigh],[xlow, xhigh],'color','r');
         xlim([-1000 1000]);
