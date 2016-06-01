@@ -114,6 +114,7 @@ def plotComp(outdir, failStatFile):
     
     x = range(4, znmax + 1)
     fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12,10))
+    fig.subplots_adjust(left=0.1)
     for isenGrp in range(4):
             
         #plt.subplot(2, 2 , isenGrp+1)

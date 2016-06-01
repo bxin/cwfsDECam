@@ -1,0 +1,397 @@
+\documentclass[]{spie}  %>>> use for US letter paper
+%\documentclass[a4paper]{spie}  %>>> use this instead for A4 paper
+%\documentclass[nocompress]{spie}  %>>> to avoid compression of citations
+
+\renewcommand{\baselinestretch}{1.0} % Change to 1.65 for double spacing
+ 
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\title{Comparison of LSST and DECam Wavefront Recovery Algorithms}
+
+\author[a]{Bo Xin}
+\author[b]{Aaron Roodman}
+\author[a]{George Angeli}
+\author[a]{Chuck Claver}
+\author[a]{Sandrine Thomas}
+\affil[a]{Large Synoptic Survey Telescope, Tucson AZ, USA}
+\affil[b]{SLAC National Accelerator Laboratory, Stanford University, Menlo Park CA, USA}
+
+\authorinfo{Further author information:\\Bo Xin: E-mail: bxin@lsst.org, Telephone: 1 520 318 8352}
+
+% Option to view page numbers
+\pagestyle{empty} % change to \pagestyle{plain} for page numbers   
+\setcounter{page}{1} % Set start page numbering at e.g. 301
+ 
+\begin{document} 
+\maketitle
+
+\begin{abstract}
+We make a detailed quantitative comparison of the wavefront recovery algorithms between those developed for Dark Energy Camera (DECam) and the Large Synoptic Survey Telescope (LSST).
+Samples used in this study include images of out of focus stars collected by the DECam at the Blanco 4-meter telescope and artificial simulated donuts. The data from DECam include wavefront images collected by the wavefront sensors and out-of-focus images where the entire DECam corrector is out of focus. For simulated images, we have used both the forward Fraunhofer diffraction intergral and a LSST-like ZEMAX optical model where the images are convolved with Kolmogorov atmosphere.
+All samples are analyzed with the forward wavefront retrieval algorithm developed for DECam and the transport of intensity algorithm for LSST.  Good quantitative agreement between results by the two implemented algorithms is observed.
+\end{abstract}
+
+% Include a list of keywords after the abstract 
+\keywords{LSST, DECam, Wavefront Sensors, Curvature Sensors, Donuts}
+
+\section{INTRODUCTION}
+\label{sec:intro}  % \label{} allows reference to this section
+The Large Synoptic Survey Telescope (LSST) is a new facility now under
+construction that will survey $\sim$20000 square degrees of the
+southern sky through 6 spectral filters ($ugrizy$) multiple times over
+a 10-year period~\cite{KahnSPIE, Ivezic08}.
+The optical system is
+based on a modified Paul-Baker 3-mirror
+telescope design having an 8.4m primary, 3.4m secondary, and 5.0m
+tertiary feeding a three-element refractive camera system producing a
+flat 9.6 square degree field-of-view with an effective clear aperture of
+6.5m. 
+LSST will use an active optics
+system (AOS) to maintain alignment and surface figure on its
+three large mirrors. Corrective actions fed to the LSST AOS are
+determined from information derived from 4 curvature wavefront sensors located at the
+corners of the focal plane. Each wavefront sensor is a split detector such that the halves
+are 1mm on either side of focus. 
+
+The LSST wavefront sensing software is described in detail in Ref.~\citenum{lsstcwfs}.
+It includes extensions to published curvature wavefront sensing algorithms needed
+to address challenges presented by the LSST, namely the large central
+obscuration, the fast $f$-1.23 beam, off-axis pupil distortions, and vignetting
+at the sensor locations. It also takes into account corrections needed for the
+split sensors and the effects from the angular separation of different
+stars providing the intra- and extra-focal images.
+The underlying baseline algorithms are the iterative Fast Fourier 
+Transform (FFT) method by Roddier and Roddier~\cite{Roddier93}, and
+the series expansion technique by Gureyev and Nugent~\cite{GuNu96}.
+Ref.~\citenum{lsstcwfs} also describes a set of very extensive tests and validations using simulated images.
+However, there is no validation using real data or direct comparison to other wavefront sensing algorithms. In this paper, we present a detailed quantitative comparison with the forward modeling algorithm that has been used by Dark Energy Camera (DECam), using both data collected by the DECam and simulated images.
+
+The DECam is a 3 square-degree field-of-view imager now in operation on the CTIO Blanco 4-meter telescope.~\cite{DECamStatus}. It has eight wavefront sensors placed on the same focal plane as the 62 science sensors, and a prime-focus hexapod to allow rapid adjustment of the camera's focus and alignment with respect to the primary mirror.
+The wavefront sensors are divided into four pairs of intra- and extra-focal sensors, located on the edge of the field of view. Each pair consists of two 2k by 2k CCD chips, placed out of focus by $\pm$1.5mm.
+The wavefront sensing and the AOS on the DECam have been proven to operate successfully, maintaining unsupervised control of the its focus and alignment~\cite{roodman14}.
+Given the similarity between the LSST and DECam, both being suvery telescopes with large field-of-view, and both employing area wavefront sensors, DECam can serve as a good test ground for the LSST wavefront sensing software. 
+
+The DECam wavefront sensing utilizes a forward-modeling non-linear $\chi^2$ fit~\cite{roodman14}. The intensity distribution on the image plane is modeled as the Fraunhofer integral, where the inputs are the pupil function and the wavefront at the exit pupil. The pupil function is a fixed property of DECam. It accounts for DECam's complicated pupil shape. The wavefront is decomposed into a set of Zernike polynomials, where the coefficients are the free parameters in the fit. The atmospheric seeing is accounted for using a convolution of the image model with a Kolmogorov kernel.
+
+For LSST, the degrees of freedom that need to be controlled include those in the two actively supported mirror systems and the positioning of the two hexapods.
+The number of degrees of freedom is significantly greater than any currently operating telescopes including DECam.
+This requires the ability to estimate higher-order properties of the aberrated wavefront.
+The current design is that Zernike coefficients, Z4 -- Z22 
+in Noll/Mahajan's definition~\cite{standardZ, annularZ}, will be measured and used by the AOS.
+For this reason, LSST has chosen to solve the transport-of-intensity equation (TIE) to retrieve the wavefront, rather than a forward-modeling approach.
+At DECam, Zernike coefficients up to trefoid (Z9, 10) are measured online, and only focus (Z4), astigmatism (Z5, 6), and coma (Z7, 8) are used to control the prime-focus camera's five degrees of freedom. 
+The spherical aberration (Z11) is fixed to a value taken from a ZEMAX model. The Fried parameter of the atmosphere is fixed at $r_0$ = 0.125m~\cite{roodman14}.
+For the comparison study presented in this paper, the DECam results come in two versions, one with fits to Zernikes up to Z11, the other with additional quadrafoil (Z14, 15).
+In the rest of this paper, the indexing and normalization of the Zernikes always follow
+the Noll/Mahajan's definition.
+
+We also need to note that this comparison study is actually a comparison between the LSST implementation of the baseline algorithms with the iterative wavefront compensation and the DECam forward modeling algorithm.
+In order to make comparison, the LSST software is run in its ``paraxial lens'' mode, meaning the algorithm extensions as described in Ref.~\citenum{lsstcwfs} are being bypassed. 
+Because the DECam software only has the standard circular Zernikes implemented, results from LSST used for comparison are also in standard Zernikes. The obscuration ratio of DECam is 34\%. This is less of a problem compared to working with LSST-like images, where the obscuration is 61\%. 
+Similarly, DECam is a $f$-2.9 system, while LSST is $f$-1.23. DECam is 2.2 degree wide field, LSST is 3.5 degree.
+Given DECam's proven success, we expect none of these to lead to significant issues to the comparison study.
+
+This paper is organized as follows.
+In Section~\ref{sec:data} we describe the data used in this analysis, including both images taken by DECam and simulated data.
+Section~\ref{sec:approach} then outlines the analysis approach.
+The results are discussed in Section~\ref{sec:results}.
+In Section~\ref{sec:summary} we give a summary and what we conclude from this analysis.
+
+\section{Data Overview}
+\label{sec:data}
+
+The comparison study is performed by analyzing the same ensembles of donut images using both softwares.
+Samples used in this study include images of out of focus stars collected by the DECam at the Blanco 4-meter telescope and artificial simulated donuts. 
+We have looked at three types of data collected by the DECam during 2014 -- 2015: (1) Wavefront sensor images taken during engineering runs, when the telescope was doing large slews throughout the night, with open AOS loop, without the look-up-table corrections. We'll later refer to these as the open-loop data.
+The wavefront aberrations vary more wildly compared to the normal observing runs.  
+(2) Wavefront sensor images taken during typical DECam observing nights. 
+(3) Science sensor images taken during engineering runs, where the entire camera was moved out of focus. 
+These also do not have the AOS corrections.
+For the wavefront sensor images, including type (1) and (2) above, the images from adjacent CCDs are from both sides of focus at $\pm$1.5mm. They can therefore directly be used by the LSST software.
+The out-of-focus science images (type (3)) are also from both sides of focus, at $\pm$ 1.5mm and $\pm$3.0mm. These were used by DECam to map out the wavefront across the focal plane.
+Both softwares use the cut-out images created by the DECam wavefront image pre-processing pipeline.
+The image stamps are 64 by 64 pixels for $\pm$1.5mm defocused images and 128 by 128 for $\pm$3.0mm defocused images.
+
+Tests using simulated images have the advantage of being able to better cover the parameter space.
+We have used two sets of simulated images. 
+In the first set, the forward-modeling code utilizing the forward Fraunhofer diffraction intergral, which is part of the DECam algorithm, is used to generate the donut images. The wavelength is 700nm.
+The second set of test images are generated using a simple ZEMAX paraxial lens model, with $f$-1.23 and central obscuration of 61\%. The parameters are the same as the LSST optical system, but the model doesn't have the fast-beam non-linear effects and the off-axis distortions. 
+Geometric Image Analysis are performed at 1mm above and below the focus.
+Both sets of images are then convolved with Kolmogorv kernels representing the atmospheric seeing.
+For each Zernike among Z4 -- Z15, intra- and extra-focal images are simulated for magnitudes of 
+0.05, 0.10, 0.25, 0.50, 1.00, 1.50, and 2.00 waves, with wavelength of 770nm.
+
+\section{Analysis Approach}
+\label{sec:approach}
+
+The DECam wavefront sensing algorithm only requires one donut image at a time, in order to fit for the wavefront. For the LSST algorithm, care needs to be taken when pairing up the intra- and extra-focal donuts.
+In terms of wavefront sensor images, for each exposure, we typically have tens of donut images on each of the eight wavefront sensors. Because the wavefront varies across the focal plane, we only use images from adjacent CCDs to form the intra- and extra-focal pairs.
+
+On each wavefront sensor, we first exclude saturated images.
+DECam chips saturate at around 40,000 counts,
+except that FS4 (amplifier with column number  $IX>$1024) and FN2 (amplifier with $IX<$1024) saturate at much lower - around 5000 counts.
+We then remove 
+the background by means of a least-square fit to the intensity outside of the signal region using a 2D linear model. The signal region is defined as an annulus large enough to cover the aberrated signals.
+Signal-to-Noise Ratio (SNR) is then calculated for each donut image based on this fit.
+To make sure the input images are of good quality, donut images with SNR less than 20 are not used.
+Next, all the donuts on each wavefront sensor are ranked using SNR from high to low.
+Intra- and extra-focal pairs are then formed by taking the first image from the intra-focal sensor and the first image from the extra-focal sensor, the second image from the intra-focal sensor and the second image from the extra-focal sensor, and so on, until the list on either sensor is exhausted.
+As an example, Figure~\ref{fig:approach} (left) shows one pair of intra- and extra-focal images on the wavefront sensors with the telescope in the open-loop mode. 
+With 15$\mu$m DECam pixels, the donuts are roughly 40 pixels in diameter.
+The SNR distributions on the pairs of wavefront sensors for the same exposure is shown in Figure~\ref{fig:approach} (right).
+
+
+   \begin{figure} [tphb]
+   \begin{center}
+   \begin{tabular}{c} %% tabular useful for creating an array of images 
+   \includegraphics[height=8cm]{figures/donuts.png}
+   \includegraphics[height=8cm]{figures/snr.png}
+   \end{tabular}
+   \end{center}
+   \caption[example] 
+   { \label{fig:approach} 
+Left: An intra-focal image (top) on wavefront sensor FN1 and an 
+extra-focal image (bottom) on wavefront sensor FN2.
+Right: SNR distributions on the pairs of wavefront sensors. The plot titles show the sensor names and the number of image pairs where both images have SNR $>$20.
+These examples are with the telescope in the open-loop mode.
+}
+   \end{figure} 
+
+After running the LSST wavefront sensing software on each of these image pairs, the recovered wavefronts, in terms of Zernike coefficients, are averaged over the same pair of wavefront sensors.
+These are then compared to the results from the DECam algorithm.
+For each pair of images used by the LSST algorithm, there are two sets of Zernike coefficents from the DECam algorithm, each from one image.
+The Z4 values are approximately $\pm$8.7$\lambda$, where the wavelength $\lambda$=700nm.
+%We average the Z4 measured for all the donuts on the same wavefront sensor, then average
+%with the Z4 from the adjacent CCDs.
+To compare to results from the LSST software, we average each Zernike over the adjacent sensors, to get one set of Zernikes for each sensor pair.
+Bad fits are excluded by requiring that the RMS of Z4 -- Z10 be less than 3$\mu$m and The magnitude of measured Z4 on each individual image be between 5$\mu$m and 15$\mu$m.
+
+For the out-of-focus DECam images, we follow the same procedure as described above for the wavefront images, except the pairing.
+After ranking the donut images from each sensor based SNR from high to low, the image pairs are formed by taking one image from an intra-focal exposure and the other image from an extra-focal exposure.
+The intra- and extra-focal images are always from the same sensor, but different exposures.
+
+The procedure is even simpler for the simulated images. The images are already paired up, and there is no background removal needed.
+
+Another note we need to make here is the orthogonality issue we mentioned already in Section~\ref{sec:intro}.
+In order to make comparison, the LSST algorithms need to use the same number of Zernikes as DECam does.
+In the LSST algorithm configuration file, an option is provided to the user to use standard Zernikes, regardless of the obscuration of the system. However, we find that the agreements between the LSST and DECam algorithms are generally improved if we still use annular Zernikes in the LSST algorithm, then post-process the results by reconstructing a wavefront map from the annular Zernike coefficients then decomposing into Standard Zernikes. We believe this is because the TIE solvers in the LSST algorithm relies more on the orthogonality of the basis set.
+We use this post-processor to get the LSST results used in the comparison.
+
+For the results shown in the next section, the LSST results are obtained using the series expansion algorithm as the baseline. As we discussed in Ref.~\citenum{lsstcwfs}, the two baseline algorithms produce very similar results. The series expansion algorithm is faster.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Comparison Using DECam Wavefront Sensor Data}
+
+Figure~\ref{fig:compZ} shows the comparison of Zernike coefficients using one exposure from the open-loop wavefront images. The LSST solutions are in red. The DECam solutions are in blue (without quadrafoil) and green (with quadrafoil). The thin dashed lines show the solutions from each individual image, or image pair, in case of the LSST solutions. The thick solid lines show the averages. In general, the agreement between the algorithms is very good. Both algorithms are robust and give consistent results.
+
+   \begin{figure} [tphb]
+   \begin{center}
+   \begin{tabular}{c} %% tabular useful for creating an array of images 
+   \includegraphics[height=11cm]{figures/compZ.png}
+   \end{tabular}
+   \end{center}
+   \caption[example] 
+   { \label{fig:compZ} 
+Comparison of Zernike coefficients using one exposure from the open-loop wavefront images. 
+}
+   \end{figure} 
+
+The comparison by Zernike between the two algorithms is shown in
+Figure~\ref{fig:skymapScatter}. The DECam results are from the fits without quadrafoil. 
+Very good agreement is seen for astigmatism, coma, and trefoil.
+Some deviations are seen on the focus term.
+Meanwhile the spherical aberration coming out of the DECam algorithm has a very small spread.
+Apparently there is cross-talk between the focus and spherical terms in one of both algorithms.
+The focus and spherical aberration are both rotationally symmetric, and includes radial terms up to $\rho^2$ and $\rho^4$, respectively, where $\rho$ is the radial coordinate on the pupil. 
+The difficulty in separating spherical from focus arises because of the limited number of pixels along the radial direction coupled with noise.
+The fact that the wavefront is different on adjacent wavefront CCDs also contributes to the differences between the results.
+
+   \begin{figure} [tphb]
+   \begin{center}
+   \begin{tabular}{c} %% tabular useful for creating an array of images 
+   \includegraphics[height=8cm]{figures/skymapScatter.png}
+   \end{tabular}
+   \end{center}
+   \caption[example] 
+   { \label{fig:skymapScatter} 
+Scatter plots of DECam results vs. LSST by Zernike. The data used are wavefront sensor images with the telescope in open-loop mode. The red diagonal lines with slope of unit are for reference.
+}
+   \end{figure} 
+
+Results we have discussed so far are with the telescope in the open-loop mode.
+Next we will show some results from running both algorithms on wavefront sensor images during typical DECam observing runs. The scatter plots look similar to those in Figure~\ref{fig:skymapScatter}, except that
+the aberrations are smaller and 
+%there are less variation between the exposures.
+the range of variation of the aberrations are smaller.
+We have also looked at how the wavefront aberrations measured on the four pairs of wavefront sensors vary
+as a function of time throughout a typical DECam observing night.
+Figure~\ref{fig:z5hist} shows the time history of 45$^\circ$ astigmatism (Z5), as measured by both algorithms.
+Figure~\ref{fig:z7hist} is the coma-y (Z7) time history for the same night.
+The DECam wavefront is very stable over time.
+Generally good agreement is observed between the two wavefront sensing algorithms, in terms of both the absolute magnitude and the exposure-to-exposure variations.
+The RMS difference between the measurements made by the two algorithms is approximately in the range of 40 -- 70 nm. This is true for all the other measured Zernikes.
+A missing data point on these plots means for a paticular exposure there is no pair of stars that could pass our saturation and SNR selections, which we described in Section~\ref{sec:approach}.
+
+   \begin{figure} [tbph]
+   \begin{center}
+   \begin{tabular}{c} %% tabular useful for creating an array of images 
+   \includegraphics[height=9cm]{figures/z5hist.png}
+   \end{tabular}
+   \end{center}
+   \caption[example] 
+   { \label{fig:z5hist} 
+Variations of 45$^\circ$ astigmatism (Z5) through a typical DECam observing night, as measured by the DECam (red) and LSST (blue) algorithms. The four panels are for the four pairs of wavefront sensors.
+The RMS differences between the measurements by the two algorithms are shown in the upper right corner of each panel. 
+}
+   \end{figure} 
+
+   \begin{figure} [tbph]
+   \begin{center}
+   \begin{tabular}{c} %% tabular useful for creating an array of images 
+   \includegraphics[height=9cm]{figures/z7hist.png}
+   \end{tabular}
+   \end{center}
+   \caption[example] 
+   { \label{fig:z7hist} 
+Variations of coma-y (Z7) through a typical DECam observing night, as measured by the DECam (red) and LSST (blue) algorithms. The four panels are for the four pairs of wavefront sensors.
+The RMS differences between the measurements by the two algorithms are shown in the upper right corner of each panel. 
+}
+   \end{figure} 
+
+DECam together with the Blanco telescope is a prime-focus system.
+Assuming the wavefront aberrations only have contributions from the primary mirror shape and the 
+five degrees of freedom of the camera hexapod, we should be able to see the 
+generic misalignment patterns as described by Schechter and Levinson~\cite{SchechterPASP} 
+and references therein.
+For the astigmatism measurements shown in Figure~\ref{fig:z5hist}, we made least-square fits to
+the tilt- and decenter-induced astigmatism field patterns, with the magnitudes and orientations as free parameters. The astigmatism patterns are shown in Figure~2(b) and described by Equation~(2) of Ref.~\citenum{SchechterPASP}.
+If the residual to the fit is constant at the four wavefront sensors, it would be evidence that it is caused by
+the primary mirror shape. This was observed to be not the case.
+We attribute this to other complications in the system such as the alignment of the sensors, the beam footprints on the lenses, and a distribution of flux outside the expected pupil outline in some wavefront images.
+The exact source of the outside flux is unknown~\cite{roodman14}.
+As the result, as discribed in Ref.~\citenum{roodman14}, the Zernike coefficents vary rapidly at the edge of the focal plane, especially in the wavefront 
+sensors.
+
+\subsection{Comparison Using DECam Defocused Focal Plane Data}
+
+Comparison is also made using out-of-focus focal plane images taken during the engineering runs.
+These are also without the AOS corrections. As the result, the wavefront aberrations can also be a bit far from zero. Figure~\ref{fig:nightScatter} shows the scatter plots comparing the two algorithms, for each Zernike separately. Looking at the Z4 plot in Figure~\ref{fig:nightScatter}, all image pairs show large focus term in the wavefront. In turn, this may have negatively impacted performance of the wavefront sensing algorithms.
+The LSST algorithm relies on the the intra- and extra-focal image planes stay well within the geometric limit~\cite{lsstcwfs}.
+It has long been observed that a large non-zero focus term affects the TIE algorithm's ability to recover the other wavefront Zernikes.
+Coma is a term easily affected, as the algorithm breaks down at relatively low magnitude.
+Figure~\ref{fig:nightScatter} shows good agreement between the two algorithms, except focus and coma.
+Other factors that might contributed to the differences between the results from the two algorithms include the temporal and spatial separations between the intra- and extra-focal images.
+Ideally, the TIE requires that the intra- and extra-focal images be taken with the same optics state and at the same field position.
+Because the out-of-focus sensor images were taken at about 30 minutes apart, the underlying wavefront may have drifted to some degree.
+If the wavefront variation within a CCD chip is large, forming image pairs solely based on SNR without taking into account the location on the CCD may also introduce bias.
+
+   \begin{figure} [tbph]
+   \begin{center}
+   \begin{tabular}{c} %% tabular useful for creating an array of images 
+   \includegraphics[height=11cm]{figures/nightScatter.png}
+   \end{tabular}
+   \end{center}
+   \caption[example] 
+   { \label{fig:nightScatter} 
+Scatter plots of DECam results vs. LSST by Zernike. The data used are out-of-focus science sensor data with the camera hexapod pistoned by $\pm$1.5mm. The red diagonal lines with slope of unit are for reference.
+}
+   \end{figure} 
+
+We checked the agreement between the two algorithms by excluding the sensors on the outside of the focal plane and remaking the plots in Figure~\ref{fig:nightScatter}. 
+We have also looked at the defocused focal plane image where the camera is moved by $\pm$3.0mm.
+In neither cases do we see improved agreement between the two algorithms.
+
+Another note to make here is the difference between pistoning the entire camera and the focal plane only.
+The LSST algorithm requires that the only change between the intra- and extra-focal images is the position of the focal plane. Moving the entire camera out of focus means the lenses are also moved. In principle, this violates the requirements of the TIE solver.
+In practice, due to the low correcting power of the DECam corrector, which does little more than changing the $f$-number of the converging beam, the TIE still can be used, with a ``effective'' image offset.
+This is confirmed by creating intra- and extra-focal images with a ZEMAX DECam model by moving the focal plane and the entire camera separately, then running the images through the LSST algorithm.
+For DECam, the effective image offset is 1.2 times the real camera offset.
+
+\subsection{Comparison Using Simulated Data}
+
+Tests using simulated data is more straightforward, because they are not subject to the real-world effects like those discussed above. However, they suffer from possible artifacts in the simulated data.
+		  
+Figure~\ref{fig:fmTest} shows the comparison between the two algorithms using the donut images simulated by the DECam forward-modeling code.
+As we discussed in Section~\ref{sec:data}, the image pairs all have single-Zernike aberrations, with various magnitudes. The tests are done for Z4 -- Z15.
+For LSST results, some data points are missing due to a warning-flag that we are close to or outside of the geometric limit.
+The missing DECam measurements are because the fit results didn't satisfy RMS(Z4--Z10)$<$3$\mu$m and 
+20$\mu$m$<|$Z4$|<$40$\mu$m.
+Both algorithms perform well on astigmatism, trefoil, second astigmatism (Z12, 13), and quadrafoil.
+For coma, the LSST algorithm starts to break down at around 1$\lambda$, where $\lambda$=700nm.
+The true input wavefront to the simulations are single-term circular Zernikes,
+while the LSST algorithm uses a finite number of annular Zernikes to recover the wavefront.
+Taking this into account, the difference in the two sets of results on focus and spherical
+doesn't necessarily mean that there is more significant cross-talk between the focus and spherical aberration in the LSST algorithm. 
+Note that the DECam algorithm also has the advantage of having the same optical model in both the simulated data and its forward fits.
+
+   \begin{figure} [tbph]
+   \begin{center}
+   \begin{tabular}{c} %% tabular useful for creating an array of images 
+   \includegraphics[height=8cm]{figures/fmTest.png}
+   \end{tabular}
+   \end{center}
+   \caption[example] 
+   { \label{fig:fmTest} 
+Comparison of wavefront recovery results using images simulated with the DECam forward-modeling code.
+The blue diagonal lines with slope of unit are for reference.
+}
+   \end{figure} 
+		  
+The same kind of comparison using the images simulated with the LSST-like paraxial ZEMAX model is shown in Figure~\ref{fig:zmxTest}. The ZEMAX model is independent of the LSST algorithm.
+Again, good agreement between the two algorithms is seen.
+For coma and spherical aberration, the LSST algorithm runs into geometric limit at around %1$\lambda$.
+700 -- 800nm.
+
+   \begin{figure} [tbph]
+   \begin{center}
+   \begin{tabular}{c} %% tabular useful for creating an array of images 
+   \includegraphics[height=8cm]{figures/zmxTest.png}
+   \end{tabular}
+   \end{center}
+   \caption[example] 
+   { \label{fig:zmxTest} 
+Comparions of wavefront recovery results using ZEMAX-simulated images.
+The blue diagonal lines with slope of unit are for reference.
+}
+   \end{figure} 
+
+\section{Summary and Conclusions}
+\label{sec:summary}
+
+We have demonstrated good agreement between the TIE-based wavefront sensing algorithm used by LSST 
+and the forward-modeling algorithm by DECam.
+The data used in this analysis include
+both wavefront images and out-of-focus focal plane images taken by DECam and simulated images.
+The correction algorithms developed by LSST targeting fast $f$-number and wide-field systems are not tested here.
+
+There appears to be some cross-talk between focus and spherical terms in one or both algorithms.
+Additionally, the LSST algorithm breaks down when certain aberrations,
+such as coma and spherical aberration, get large due to the geometric limit.
+However, 
+a $\pm$1.5mm image offset for a $f$-2.9 system is equivalent to a $\pm$0.6mm offset for a $f$-1.23 system.
+The nominal wavefront sensor image offset for LSST is $\pm$1mm. Some recent internal trade studies indicate that we may want to push it to $\pm$2mm. With 10$\mu$m pixels, the LSST donuts with $\pm$2mm image offset will be about 165 pixels in diameter.
+We expect the geometric limit not an problem for LSST operation.
+The better pupil sampling and the use of the annular Zernikes on the annular pupil will both help reduce the cross-talk between Zernike modes with same azimuthal frequency.
+
+Lastly, as we have seen on DECam, during normal observing, the wavefront aberrations measured by the wavefront sensors are small.
+For LSST, at the beginning of each night, the aberrations may be relatively large.
+As long as the wavefront retrieval algorithm doesn't break down, we expect the AOS will quickly pull the system back into convergence, so that it doesn't need to work anywhere close to the geometric limit.
+
+
+\acknowledgments % equivalent to \section*{ACKNOWLEDGMENTS}       
+
+We thank Paul Schechter for his critical comments on our work and helpful discussions.
+ 
+This material is based upon work supported in part by the National Science Foundation through Cooperative Support Agreement (CSA) Award No. AST-1227061 under Governing Cooperative Agreement 1258333 managed by the Association of Universities for Research in Astronomy (AURA), and the Department of Energy under Contract No. DEAC02-76SF00515 with the SLAC National Accelerator Laboratory. Additional LSST funding comes from private donations, grants to universities, and in-kind support from LSSTC Institutional Members.
+
+% References
+\def\pasp{Publications of the Astronomical Society of the Pacific}%
+
+\bibliography{report} % bibliography data in report.bib
+\bibliographystyle{spiebib} % makes bibtex use spiebib.bst
+
+\end{document} 
