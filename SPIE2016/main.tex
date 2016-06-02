@@ -29,7 +29,8 @@
 
 \begin{abstract}
 We make a detailed quantitative comparison of the wavefront recovery algorithms between those developed for Dark Energy Camera (DECam) and the Large Synoptic Survey Telescope (LSST).
-Samples used in this study include images of out of focus stars collected by the DECam at the Blanco 4-meter telescope and artificial simulated donuts. The data from DECam include wavefront images collected by the wavefront sensors and out-of-focus images where the entire DECam corrector is out of focus. For simulated images, we have used both the forward Fraunhofer diffraction intergral and a LSST-like ZEMAX optical model where the images are convolved with Kolmogorov atmosphere.
+Samples used in this study include images of out of focus stars collected by the DECam at the Blanco 4-meter telescope and artificial simulated donut images. 
+The data from DECam include wavefront images collected by the wavefront sensors and out-of-focus images where the entire DECam corrector is out of focus. For simulated images, we have used both the forward Fraunhofer diffraction and a LSST-like ZEMAX optical model where the images are convolved with Kolmogorov atmosphere.
 All samples are analyzed with the forward wavefront retrieval algorithm developed for DECam and the transport of intensity algorithm for LSST.  Good quantitative agreement between results by the two implemented algorithms is observed.
 \end{abstract}
 
@@ -70,7 +71,7 @@ However, there is no validation using real data or direct comparison to other wa
 
 The DECam is a 3 square-degree field-of-view imager now in operation on the CTIO Blanco 4-meter telescope.~\cite{DECamStatus}. It has eight wavefront sensors placed on the same focal plane as the 62 science sensors, and a prime-focus hexapod to allow rapid adjustment of the camera's focus and alignment with respect to the primary mirror.
 The wavefront sensors are divided into four pairs of intra- and extra-focal sensors, located on the edge of the field of view. Each pair consists of two 2k by 2k CCD chips, placed out of focus by $\pm$1.5mm.
-The wavefront sensing and the AOS on the DECam have been proven to operate successfully, maintaining unsupervised control of the its focus and alignment~\cite{roodman14}.
+The wavefront sensing and the AOS on the DECam have been proven to operate successfully, maintaining unsupervised control of the focus and alignment~\cite{roodman14}.
 Given the similarity between the LSST and DECam, both being suvery telescopes with large field-of-view, and both employing area wavefront sensors, DECam can serve as a good test ground for the LSST wavefront sensing software. 
 
 The DECam wavefront sensing utilizes a forward-modeling non-linear $\chi^2$ fit~\cite{roodman14}. The intensity distribution on the image plane is modeled as the Fraunhofer integral, where the inputs are the pupil function and the wavefront at the exit pupil. The pupil function is a fixed property of DECam. It accounts for DECam's complicated pupil shape. The wavefront is decomposed into a set of Zernike polynomials, where the coefficients are the free parameters in the fit. The atmospheric seeing is accounted for using a convolution of the image model with a Kolmogorov kernel.
@@ -81,9 +82,10 @@ This requires the ability to estimate higher-order properties of the aberrated w
 The current design is that Zernike coefficients, Z4 -- Z22 
 in Noll/Mahajan's definition~\cite{standardZ, annularZ}, will be measured and used by the AOS.
 For this reason, LSST has chosen to solve the transport-of-intensity equation (TIE) to retrieve the wavefront, rather than a forward-modeling approach.
-At DECam, Zernike coefficients up to trefoid (Z9, 10) are measured online, and only focus (Z4), astigmatism (Z5, 6), and coma (Z7, 8) are used to control the prime-focus camera's five degrees of freedom. 
+For DECam online operation, Zernike coefficients up to trefoid (Z9, 10) are measured, and only focus (Z4), astigmatism (Z5, 6), and coma (Z7, 8) are used to control the prime-focus camera's five degrees of freedom. 
 The spherical aberration (Z11) is fixed to a value taken from a ZEMAX model. The Fried parameter of the atmosphere is fixed at $r_0$ = 0.125m~\cite{roodman14}.
-For the comparison study presented in this paper, the DECam results come in two versions, one with fits to Zernikes up to Z11, the other with additional quadrafoil (Z14, 15).
+For offline analysis, the forward fit includes Z11 and $r_0$ as free parameters.
+In the comparison study presented in this paper, the DECam results come in two versions, one with fits to Zernikes up to Z11, the other with additional quadrafoil (Z14, 15).
 In the rest of this paper, the indexing and normalization of the Zernikes always follow
 the Noll/Mahajan's definition.
 
@@ -102,7 +104,7 @@ In Section~\ref{sec:summary} we give a summary and what we conclude from this an
 \section{Data Overview}
 \label{sec:data}
 
-The comparison study is performed by analyzing the same ensembles of donut images using both softwares.
+The comparison study is performed by analyzing the same ensembles of donut images using both algorithms.
 Samples used in this study include images of out of focus stars collected by the DECam at the Blanco 4-meter telescope and artificial simulated donuts. 
 We have looked at three types of data collected by the DECam during 2014 -- 2015: (1) Wavefront sensor images taken during engineering runs, when the telescope was doing large slews throughout the night, with open AOS loop, without the look-up-table corrections. We'll later refer to these as the open-loop data.
 The wavefront aberrations vary more wildly compared to the normal observing runs.  
@@ -205,7 +207,7 @@ Figure~\ref{fig:skymapScatter}. The DECam results are from the fits without quad
 Very good agreement is seen for astigmatism, coma, and trefoil.
 Some deviations are seen on the focus term.
 Meanwhile the spherical aberration coming out of the DECam algorithm has a very small spread.
-Apparently there is cross-talk between the focus and spherical terms in one of both algorithms.
+Apparently there is cross-talk between the focus and spherical terms in one or both algorithms.
 The focus and spherical aberration are both rotationally symmetric, and includes radial terms up to $\rho^2$ and $\rho^4$, respectively, where $\rho$ is the radial coordinate on the pupil. 
 The difficulty in separating spherical from focus arises because of the limited number of pixels along the radial direction coupled with noise.
 The fact that the wavefront is different on adjacent wavefront CCDs also contributes to the differences between the results.
@@ -262,19 +264,6 @@ The RMS differences between the measurements by the two algorithms are shown in 
 }
    \end{figure} 
 
-DECam together with the Blanco telescope is a prime-focus system.
-Assuming the wavefront aberrations only have contributions from the primary mirror shape and the 
-five degrees of freedom of the camera hexapod, we should be able to see the 
-generic misalignment patterns as described by Schechter and Levinson~\cite{SchechterPASP} 
-and references therein.
-For the astigmatism measurements shown in Figure~\ref{fig:z5hist}, we made least-square fits to
-the tilt- and decenter-induced astigmatism field patterns, with the magnitudes and orientations as free parameters. The astigmatism patterns are shown in Figure~2(b) and described by Equation~(2) of Ref.~\citenum{SchechterPASP}.
-If the residual to the fit is constant at the four wavefront sensors, it would be evidence that it is caused by
-the primary mirror shape. This was observed to be not the case.
-We attribute this to other complications in the system such as the alignment of the sensors, the beam footprints on the lenses, and a distribution of flux outside the expected pupil outline in some wavefront images.
-The exact source of the outside flux is unknown~\cite{roodman14}.
-As the result, as discribed in Ref.~\citenum{roodman14}, the Zernike coefficents vary rapidly at the edge of the focal plane, especially in the wavefront 
-sensors.
 
 \subsection{Comparison Using DECam Defocused Focal Plane Data}
 
