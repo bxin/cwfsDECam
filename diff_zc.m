@@ -6,9 +6,10 @@ function [] = diff_zc(plotStyle,znmax, writez2z)
 % plotStyle = 'diff', 'ratio', 'histogram', 'scatter', 'history'
 % znmax = 11, 15, or 22
 
-dataset = 'output/skymap/20140613s1';
-% dataset = 'output/skymap/20140315s1';
-% dataset = 'output/nights/20150108s1';
+dataIN = {'output/skymap/20140613s1','output/skymap/20140315s1'};
+% dataIN = {'output/skymap/20140613s1'};
+% dataIN = {'output/skymap/20140315s1'};
+% dataIN = {'output/nights/20150108s1'};
 
 
 if znmax==11
@@ -21,61 +22,81 @@ else
     ncol = 4;
 end
 
-expIdList = dir(dataset);
 %% count the number of exposures
-nexp = 0;
-for i = 1:size(expIdList,1)
-    filename = sprintf('%s/%s/snr.txt',dataset,expIdList(i).name);
-    if exist(filename, 'file')
-        nexp = nexp + 1;
-    end
-end
-
-cwfs = zeros(4, nexp, znmax-3);
-fmzc = zeros(4, nexp, znmax-3);
-iexp = 0;
-z2zfile = sprintf('%s/z2z_%d.mat',dataset, znmax);
-if writez2z
+nset = size(dataIN,2);
+nexp=zeros(1,nset);
+for iset = 1:nset
+    dataset=dataIN{iset};
+    
+    expIdList = dir(dataset);
+    
     for i = 1:size(expIdList,1)
         filename = sprintf('%s/%s/snr.txt',dataset,expIdList(i).name);
         if exist(filename, 'file')
-            iexp = iexp + 1;
-            for isenGrp=0:3
-                filename=sprintf('%s/%s/ave_grp%d.txt',dataset,expIdList(i).name,isenGrp);
-                if exist(filename, 'file')
-                    data = load(filename);
-                    zread = [0 0 0 data(1,:)];
-                    if znmax == 11
-                        znew = z2z(zread,0.3396, 0 , znmax);
-                        cwfs(isenGrp+1, iexp, :) = znew(4:end);
-                        fmzc(isenGrp+1, iexp, :) =  data(2,1:znmax-3);
-                    elseif znmax == 15
-                        znew = z2z(zread,0.3396, 0 , [1:11 14:15]);
-                        cwfs(isenGrp+1, iexp, :) = znew(4:end);
-                        fmzc(isenGrp+1, iexp, :) =  data(3,1:znmax-3);
-                    elseif znmax == 22
-                        cwfs(isenGrp+1, iexp, :) = zread(4:end);
-                        fmzc(isenGrp+1, iexp, :) =  data(3,1:znmax-3);
+            nexp(iset) = nexp(iset) + 1;
+        end
+    end
+end
+
+for iset = 1:nset
+    cwfs = zeros(4, nexp(iset), znmax-3);
+    fmzc = zeros(4, nexp(iset), znmax-3);
+    iexp = 0;
+    dataset=dataIN{iset};
+    z2zfile = sprintf('%s/z2z_%d.mat',dataset, znmax);
+    if writez2z
+        for i = 1:size(expIdList,1)
+            filename = sprintf('%s/%s/snr.txt',dataset,expIdList(i).name);
+            if exist(filename, 'file')
+                iexp = iexp + 1;
+                for isenGrp=0:3
+                    filename=sprintf('%s/%s/ave_grp%d.txt',dataset,expIdList(i).name,isenGrp);
+                    if exist(filename, 'file')
+                        data = load(filename);
+                        zread = [0 0 0 data(1,:)];
+                        if znmax == 11
+                            znew = z2z(zread,0.3396, 0 , znmax);
+                            cwfs(isenGrp+1, iexp, :) = znew(4:end);
+                            fmzc(isenGrp+1, iexp, :) =  data(2,1:znmax-3);
+                        elseif znmax == 15
+                            znew = z2z(zread,0.3396, 0 , [1:11 14:15]);
+                            cwfs(isenGrp+1, iexp, :) = znew(4:end);
+                            fmzc(isenGrp+1, iexp, :) =  data(3,1:znmax-3);
+                        elseif znmax == 22
+                            cwfs(isenGrp+1, iexp, :) = zread(4:end);
+                            fmzc(isenGrp+1, iexp, :) =  data(3,1:znmax-3);
+                        end
+                    else
+                        cwfs(isenGrp+1, iexp, :) =  nan;
+                        fmzc(isenGrp+1, iexp, :) =  nan;
                     end
-                else
-                    cwfs(isenGrp+1, iexp, :) =  nan;
-                    fmzc(isenGrp+1, iexp, :) =  nan;
                 end
             end
         end
+        save(z2zfile,'cwfs','fmzc');
     end
-    save(z2zfile,'cwfs','fmzc');
-else
-    load(z2zfile,'cwfs','fmzc');
 end
-   
+
+%combine datasets
+cwfsALL = zeros(4, sum(nexp), znmax-3);
+fmzcALL = zeros(4, sum(nexp), znmax-3);
+for iset = 1:nset
+    dataset=dataIN{iset};
+    z2zfile = sprintf('%s/z2z_%d.mat',dataset, znmax);
+    load(z2zfile,'cwfs','fmzc');
+    iexp = find(cwfsALL(1,:,1)==0,1,'first');
+    iiexp = size(cwfs,2);
+    cwfsALL(:,iexp:iexp+iiexp-1,:) = cwfs;
+    fmzcALL(:,iexp:iexp+iiexp-1,:) = fmzc;
+end
+
 set(gcf,'color','w');
 
 if strcmp(plotStyle, 'diff')
     figure(1);clf;
     for isenGrp=0:3
         subplot(2,2,isenGrp+1);
-        plot(4:znmax, squeeze(fmzc(isenGrp+1, :, :) - cwfs(isenGrp+1, :, :))','o');
+        plot(4:znmax, squeeze(fmzcALL(isenGrp+1, :, :) - cwfsALL(isenGrp+1, :, :))','o');
         xlim([4-0.5 znmax+0.5]);
         grid on;
         xlabel('Zernike Number');ylabel('coefficient (in nm)');
@@ -85,7 +106,7 @@ elseif strcmp(plotStyle, 'ratio')
     figure(1);clf;
     for isenGrp=0:3
         subplot(2,2,isenGrp+1);
-        plot(4:znmax, squeeze(fmzc(isenGrp+1, :, :)./cwfs(isenGrp+1, :, :))','o');
+        plot(4:znmax, squeeze(fmzcALL(isenGrp+1, :, :)./cwfsALL(isenGrp+1, :, :))','o');
         xlim([4-0.5 znmax+0.5]);
         ylim([-10 10]);
         grid on;
@@ -97,7 +118,7 @@ elseif strcmp(plotStyle, 'histogram')
     figure(1);clf; %zc0
     for iz=4:znmax
         subplot(5,4,iz-3);
-        aa=hist(reshape(squeeze(fmzc(:, :, iz-3) - cwfs(:, :, iz-3)),[], ...
+        aa=hist(reshape(squeeze(fmzcALL(:, :, iz-3) - cwfsALL(:, :, iz-3)),[], ...
             1),xbin);
         aa=aa/(sum(aa))*100;
         bar(xbin,aa);
@@ -112,7 +133,7 @@ elseif strcmp(plotStyle, 'scatter')
     figure(1);clf; %zc0
     for iz=4:znmax
         subplot(nrow,ncol,iz-3);
-        scatter(reshape(squeeze(fmzc(:, :, iz-3)),[],1), reshape(cwfs(:, :, iz-3),[],1),150,'.');
+        scatter(reshape(squeeze(fmzcALL(:, :, iz-3)),[],1), reshape(cwfsALL(:, :, iz-3),[],1),150,'.');
         line([xlow, xhigh],[xlow, xhigh],'color','r');
         xlim([-1000 1000]);
         ylim([-1000 1000]);
@@ -128,17 +149,17 @@ elseif strcmp(plotStyle, 'scatter')
     samexyaxis('xmt','on','ytac','join','yld',1);
 elseif strcmp(plotStyle, 'history')
     for iz=4:znmax
-        plot_zn_history(1,iz, fmzc, cwfs);
+        plot_zn_history(1,iz, fmzcALL, cwfsALL);
         if iz==5
             %fit to decenter or tilt
-            %             fmzc = subtract_misalign(fmzc);
-            %             cwfs = subtract_misalign(cwfs);
+            %             fmzcALL = subtract_misalign(fmzcALL);
+            %             cwfsALL = subtract_misalign(cwfsALL);
             %fit to decenter AND tilt
-            fmzc = subtract_misalign2(fmzc);
-            cwfs = subtract_misalign2(cwfs);
+            fmzcALL = subtract_misalign2(fmzcALL);
+            cwfsALL = subtract_misalign2(cwfsALL);
         end
         if (iz==5 || iz==6)
-            plot_zn_history(2,iz, fmzc, cwfs);
+            plot_zn_history(2,iz, fmzcALL, cwfsALL);
         end
     end
     
@@ -148,8 +169,8 @@ elseif strcmp(plotStyle, 'history1')
     figure(1);clf; %zc0
     for iz=4:znmax
         subplot(3,4,iz-3);
-        fm=mean(squeeze(fmzc(:, :, iz-3)));
-        cw=mean(squeeze(cwfs(:,:, iz-3)));
+        fm=mean(squeeze(fmzcALL(:, :, iz-3)));
+        cw=mean(squeeze(cwfsALL(:,:, iz-3)));
         idxfm = ~isnan(fm);
         idxcw = ~isnan(cw);
         idx = (idxfm & idxcw);
